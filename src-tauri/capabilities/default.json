@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Permissions for the main window: core webview plus the SQLite store. sql:default only covers load/select, so execute (writes) needs its own grant. App-defined commands (mail_*) aren't part of the ACL and don't need an entry here.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "sql:default",
+    "sql:allow-execute"
+  ]
+}

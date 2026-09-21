@@ -1,0 +1,21 @@
+[package]
+name = "zeraph-desk"
+version = "0.1.0"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-sql = { version = "2", features = ["sqlite"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# v1 mail path: app password, no OAuth.
+imap = "3.0.0-alpha.15"
+native-tls = "0.2"
+lettre = { version = "0.11", default-features = false, features = ["smtp-transport", "native-tls", "builder"] }
+mail-parser = "0.9"
+keyring = "3"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }

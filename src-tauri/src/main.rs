@@ -1,0 +1,37 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+mod mail;
+
+use tauri_plugin_sql::{Migration, MigrationKind};
+
+fn main() {
+    let migrations = vec![
+        Migration {
+            version: 1,
+            description: "create core tables",
+            sql: include_str!("../migrations/001_init.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 2,
+            description: "add message_id for reply threading",
+            sql: include_str!("../migrations/002_message_id.sql"),
+            kind: MigrationKind::Up,
+        },
+    ];
+
+    tauri::Builder::default()
+        .plugin(
+            tauri_plugin_sql::Builder::default()
+                .add_migrations("sqlite:zeraph.db", migrations)
+                .build(),
+        )
+        .invoke_handler(tauri::generate_handler![
+            mail::mail_connect,
+            mail::mail_is_connected,
+            mail::mail_pull,
+            mail::mail_send,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running Zeraph Desk");
+}

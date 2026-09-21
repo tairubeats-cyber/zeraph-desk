@@ -1,0 +1,31 @@
+name = "zeraph-api"
+main = "src/index.ts"
+compatibility_date = "2026-09-17"
+
+# Manually created (see setup notes below). Holds seat tokens, per-seat daily
+# usage, and per-seat rate-limit counters — everything this proxy needs to
+# meter and gate requests, all under one namespace since scale is a handful
+# of customers, not a platform.
+kv_namespaces = [
+  { binding = "ZERAPH_KV", id = "REPLACE_WITH_KV_NAMESPACE_ID" }
+]
+
+[vars]
+ANTHROPIC_MODEL = "claude-sonnet-5"
+RATE_LIMIT_PER_MINUTE = "20"
+
+# ANTHROPIC_API_KEY is a secret, not a var — never put it here.
+# Production:  wrangler secret put ANTHROPIC_API_KEY
+# Local dev:   create worker/.dev.vars with ANTHROPIC_API_KEY=sk-ant-...
+#              (.dev.vars is gitignored; wrangler dev reads it automatically)
+
+# --- One-time setup, run from worker/ ---
+# 1. wrangler login
+# 2. wrangler kv namespace create ZERAPH_KV
+#    -> paste the returned id into kv_namespaces above (and again for
+#       [env.production] or your preview config, if you split them later)
+# 3. wrangler secret put ANTHROPIC_API_KEY
+# 4. Issue a seat token per customer:
+#    wrangler kv key put --binding=ZERAPH_KV "seat:<random-token>" \
+#      '{"seatId":"<customer-slug>","business":"<business name>"}'
+# 5. wrangler deploy
