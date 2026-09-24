@@ -1,9 +1,13 @@
 import { useState } from "react";
 import type { BusinessFacts } from "../lib/facts";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { TextAreaField, TextField } from "@/components/ui/field";
+import { PageHeader } from "../components/PageHeader";
 
 interface Props {
   facts: BusinessFacts;
-  onSave: (facts: BusinessFacts) => void;
+  onSave: (facts: BusinessFacts) => void | Promise<void>;
 }
 
 function Lines({
@@ -18,122 +22,116 @@ function Lines({
   onChange: (v: string[]) => void;
 }) {
   return (
-    <div className="mt-8">
-      <label className="text-sm font-medium text-ink">{label}</label>
-      <p className="mt-1 max-w-[62ch] text-sm text-ink-soft">{help}</p>
-      <textarea
+    <Card className="p-5 md:p-6">
+      <TextAreaField
+        label={label}
+        help={help}
         value={value.join("\n")}
         onChange={(e) => onChange(e.target.value.split("\n"))}
         rows={5}
-        className="mt-2 w-full max-w-[72ch] rounded-md border border-paper-edge bg-white px-4 py-3 text-sm leading-relaxed"
       />
-    </div>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <div>
-      <label className="text-sm font-medium text-ink">{label}</label>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="mt-1 w-full rounded-md border border-paper-edge bg-white px-3 py-2 text-sm"
-      />
-    </div>
+    </Card>
   );
 }
 
 export function Facts({ facts, onSave }: Props) {
   const [draft, setDraft] = useState<BusinessFacts>(facts);
+  const [saving, setSaving] = useState(false);
   const set = <K extends keyof BusinessFacts>(key: K, value: BusinessFacts[K]) =>
     setDraft((d) => ({ ...d, [key]: value }));
 
+  const dirty = JSON.stringify(draft) !== JSON.stringify(facts);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await onSave(draft);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <div className="max-w-[72ch] pb-24">
-      <h1 className="font-display text-4xl text-ink">Your business</h1>
-      <p className="mt-3 max-w-[62ch] text-sm leading-relaxed text-ink-soft">
-        Everything Desk knows when it writes for you. The more exact the pricing, the less you'll
-        edit. It stays on this computer; only the lines needed for a reply are sent when a draft is
-        written.
-      </p>
+    <div>
+      <PageHeader
+        title="Your business"
+        description="Everything Desk knows when it writes for you. The more exact the pricing, the less you'll edit. It stays on this computer; only the lines needed for a reply are sent when a draft is written."
+      />
 
-      <div className="mt-10 grid grid-cols-2 gap-4">
-        <Field label="Business name" value={draft.name} onChange={(v) => set("name", v)} />
-        <Field label="Your name" value={draft.ownerName} onChange={(v) => set("ownerName", v)} />
-        <Field label="Phone" value={draft.phone} onChange={(v) => set("phone", v)} />
-        <Field
-          label="Sign off as"
-          value={draft.signOff}
-          onChange={(v) => set("signOff", v)}
-          placeholder="— Sam"
+      <div className="space-y-4">
+        <Card className="p-5 md:p-6">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TextField label="Business name" value={draft.name} onChange={(e) => set("name", e.target.value)} />
+            <TextField
+              label="Your name"
+              value={draft.ownerName}
+              onChange={(e) => set("ownerName", e.target.value)}
+            />
+            <TextField label="Phone" type="tel" value={draft.phone} onChange={(e) => set("phone", e.target.value)} />
+            <TextField
+              label="Sign off as"
+              value={draft.signOff}
+              onChange={(e) => set("signOff", e.target.value)}
+              placeholder="— Sam"
+            />
+            <TextField
+              label="Service area"
+              value={draft.serviceArea}
+              onChange={(e) => set("serviceArea", e.target.value)}
+              placeholder="Union and Essex County"
+            />
+            <TextField
+              label="Hours"
+              value={draft.hours}
+              onChange={(e) => set("hours", e.target.value)}
+              placeholder="Mon–Fri 7–5, Sat mornings"
+            />
+          </div>
+        </Card>
+
+        <Lines
+          label="What you do"
+          help="One service per line, in the words you'd use with a customer."
+          value={draft.services}
+          onChange={(v) => set("services", v)}
         />
-        <Field
-          label="Service area"
-          value={draft.serviceArea}
-          onChange={(v) => set("serviceArea", v)}
-          placeholder="Union and Essex County"
+        <Lines
+          label="What it costs"
+          help="Ranges are fine and better than nothing. One per line: the job, then the range, then what changes it."
+          value={draft.pricing}
+          onChange={(v) => set("pricing", v)}
         />
-        <Field
-          label="Hours"
-          value={draft.hours}
-          onChange={(v) => set("hours", v)}
-          placeholder="Mon–Fri 7–5, Sat mornings"
+        <Lines
+          label="What you turn down"
+          help="Work you don't take. Desk will decline it politely instead of booking you into it."
+          value={draft.wontDo}
+          onChange={(v) => set("wontDo", v)}
         />
+        <Lines
+          label="Policies"
+          help="Deposits, warranty, lead time, financing — anything a reply might need to say."
+          value={draft.policies}
+          onChange={(v) => set("policies", v)}
+        />
+
+        <Card className="p-5 md:p-6">
+          <TextAreaField
+            label="Anything else"
+            value={draft.notes}
+            onChange={(e) => set("notes", e.target.value)}
+            rows={6}
+          />
+        </Card>
       </div>
 
-      <Lines
-        label="What you do"
-        help="One service per line, in the words you'd use with a customer."
-        value={draft.services}
-        onChange={(v) => set("services", v)}
-      />
-      <Lines
-        label="What it costs"
-        help="Ranges are fine and better than nothing. One per line: the job, then the range, then what changes it."
-        value={draft.pricing}
-        onChange={(v) => set("pricing", v)}
-      />
-      <Lines
-        label="What you turn down"
-        help="Work you don't take. Desk will decline it politely instead of booking you into it."
-        value={draft.wontDo}
-        onChange={(v) => set("wontDo", v)}
-      />
-      <Lines
-        label="Policies"
-        help="Deposits, warranty, lead time, financing — anything a reply might need to say."
-        value={draft.policies}
-        onChange={(v) => set("policies", v)}
-      />
-
-      <div className="mt-8">
-        <label className="text-sm font-medium text-ink">Anything else</label>
-        <textarea
-          value={draft.notes}
-          onChange={(e) => set("notes", e.target.value)}
-          rows={6}
-          className="mt-2 w-full rounded-md border border-paper-edge bg-white px-4 py-3 text-sm leading-relaxed"
-        />
+      <div className="sticky bottom-0 -mx-4 mt-6 flex items-center justify-end gap-4 border-t border-line bg-glass px-4 py-3 backdrop-blur-md md:-mx-8 md:px-8">
+        <p aria-live="polite" className="text-label font-normal text-ink-tertiary">
+          {dirty ? "Unsaved changes" : ""}
+        </p>
+        <Button variant="primary" loading={saving} disabled={!dirty} onClick={() => void save()}>
+          Save
+        </Button>
       </div>
-
-      <button
-        onClick={() => onSave(draft)}
-        className="mt-8 rounded-md bg-gold px-4 py-2 text-sm font-medium text-navy-900 hover:bg-gold-deep hover:text-paper"
-      >
-        Save
-      </button>
     </div>
   );
 }

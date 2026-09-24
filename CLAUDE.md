@@ -71,10 +71,27 @@ Do not start a later phase before the one before it works end to end.
 
 ## Design language
 
-Defined in `src/index.css` as tokens. Navy chrome, warm paper canvas, gold used
-for exactly one thing: the approve action. Cormorant Garamond appears only in
-display moments (queue heading, empty states); everything else is the UI sans.
-Don't spread the gold around. Don't add a second accent.
+Apple-inspired: calm, spacious, quiet. Tokens live in `src/index.css` and are
+mapped in `tailwind.config.js`; components read tokens (`bg-surface`,
+`text-ink-secondary`), never raw colours, so a dark theme is one more token
+block and nothing else.
+
+- **Surfaces, back to front:** window (`background`), sidebar, card (`surface`),
+  inset fills (`surface-secondary`), floating (`surface-elevated`, toasts).
+- **One accent** (system blue): the primary action (approve, connect, save),
+  selection, and keyboard focus. Everything else is neutral. Colour is for
+  meaning only — success, warning, danger. Don't add a second accent.
+- **Type:** system stack (SF on Apple, Inter elsewhere). Hierarchy comes from
+  size, weight and spacing, never past weight 600. Named sizes: `text-title`,
+  `text-heading`, `text-body`, `text-label`, `text-meta`.
+- **Shared primitives** are in `src/components/ui/` (`Button`, `TextField`,
+  `TextAreaField`, `Card`). Use them; don't restyle a raw `<button>` or `<input>`.
+- **Motion** is short (150–250ms) and never decorative. `prefers-reduced-motion`
+  is honoured globally in CSS and in `FloatingPathsBackground`.
+- **Accessibility is not optional:** every control has a real label, text meets
+  4.5:1 on the surface it sits on, focus is always visible, and the sidebar
+  collapses to a rail and then a bottom tab bar rather than shrinking.
+- Icons are Lucide, thin (`strokeWidth` 1.5–1.75). Don't mix icon sets.
 
 ## Current state — v1, cut
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Sidebar, type ViewKey } from "./components/Sidebar";
 import { Queue } from "./views/Queue";
 import { History } from "./views/History";
@@ -11,13 +11,16 @@ import { emailConnector } from "./connectors/email";
 import { syncInbox, proposeFollowUps } from "./lib/sync";
 
 const SYNC_INTERVAL_MS = 60_000;
+/** Matches the `toast` animation length in tailwind.config.js. */
+const TOAST_MS = 2600;
 
 export default function App() {
   const [view, setView] = useState<ViewKey>("queue");
   const [pending, setPending] = useState<Action[]>([]);
   const [past, setPast] = useState<Action[]>([]);
   const [facts, setFacts] = useState<BusinessFacts>(EMPTY_FACTS);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout>>();
 
   async function refresh() {
     setPending(await db.pendingActions());
@@ -49,8 +52,9 @@ export default function App() {
   }, []);
 
   function flash(message: string) {
-    setToast(message);
-    setTimeout(() => setToast(null), 2600);
+    clearTimeout(toastTimer.current);
+    setToast({ id: Date.now(), text: message });
+    toastTimer.current = setTimeout(() => setToast(null), TOAST_MS);
   }
 
   async function approve(action: Action, body: string) {
@@ -97,31 +101,51 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-full">
+    // flex-col-reverse puts the nav (first in the DOM, so first for keyboard and
+    // screen readers) at the bottom on phone widths.
+    <div className="flex h-full flex-col-reverse md:flex-row">
+      <a
+        href="#main"
+        onClick={(e) => {
+          e.preventDefault();
+          document.getElementById("main")?.focus();
+        }}
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-control focus:bg-surface focus:px-4 focus:py-2 focus:text-label focus:text-ink focus:shadow-elevated"
+      >
+        Skip to content
+      </a>
+
       <Sidebar current={view} pendingCount={pending.length} onSelect={setView} />
 
-      <main className="flex-1 overflow-y-auto px-14 py-12">
-        {view === "queue" && <Queue actions={pending} onApprove={approve} onDecline={decline} />}
-        {view === "history" && <History actions={past} />}
-        {view === "facts" && (
-          <Facts
-            facts={facts}
-            onSave={async (next) => {
-              await db.saveFacts(next);
-              flash("Saved");
-              await refresh();
-            }}
-          />
-        )}
-        {view === "settings" && <Settings />}
+      <main id="main" tabIndex={-1} className="min-w-0 flex-1 overflow-y-auto focus:outline-none">
+        <div key={view} className="mx-auto w-full max-w-[760px] animate-view-in px-4 py-6 md:px-8 md:py-10">
+          {view === "queue" && <Queue actions={pending} onApprove={approve} onDecline={decline} />}
+          {view === "history" && <History actions={past} />}
+          {view === "facts" && (
+            <Facts
+              facts={facts}
+              onSave={async (next) => {
+                await db.saveFacts(next);
+                flash("Saved");
+                await refresh();
+              }}
+            />
+          )}
+          {view === "settings" && <Settings />}
+        </div>
       </main>
 
+      {/* Always mounted so screen readers announce changes; the visible toast below is decoration. */}
+      <div role="status" aria-live="polite" className="sr-only">
+        {toast?.text}
+      </div>
       {toast && (
         <div
-          role="status"
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-md bg-navy-900 px-4 py-2 text-sm text-paper shadow-lg"
+          key={toast.id}
+          aria-hidden="true"
+          className="pointer-events-none fixed bottom-6 left-1/2 z-40 max-w-[calc(100vw-2rem)] animate-toast rounded-xl bg-hud px-4 py-2.5 text-label text-hud-text shadow-elevated backdrop-blur-md max-md:bottom-24"
         >
-          {toast}
+          {toast.text}
         </div>
       )}
     </div>

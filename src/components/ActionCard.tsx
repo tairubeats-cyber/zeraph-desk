@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { type Action, ACTION_LABELS, APPROVE_VERB } from "../lib/actions";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input, Textarea } from "@/components/ui/field";
 
 interface Props {
   action: Action;
-  onApprove: (action: Action, editedBody: string) => void;
-  onDecline: (action: Action, reason: string) => void;
+  onApprove: (action: Action, editedBody: string) => void | Promise<void>;
+  onDecline: (action: Action, reason: string) => void | Promise<void>;
 }
 
 function bodyOf(action: Action): string {
@@ -34,66 +37,93 @@ export function ActionCard({ action, onApprove, onDecline }: Props) {
   const [body, setBody] = useState(bodyOf(action));
   const [declining, setDeclining] = useState(false);
   const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState<"approve" | "decline" | null>(null);
   const verb = APPROVE_VERB[action.kind];
   const to = recipientOf(action);
 
+  // Sending takes a moment. Block a second click so nothing goes out twice.
+  async function run(kind: "approve" | "decline", fn: () => void | Promise<void>) {
+    if (busy) return;
+    setBusy(kind);
+    try {
+      await fn();
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
-    <article className="border-b border-paper-edge py-8 first:pt-0">
-      <header className="flex items-baseline gap-3">
-        <span className="text-sm font-medium text-ink">{ACTION_LABELS[action.kind]}</span>
-        {to && <span className="text-sm text-ink-soft">to {to}</span>}
-        <span className="ml-auto text-xs text-ink-soft">
-          {new Date(action.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
-        </span>
-      </header>
+    <Card
+      as="article"
+      aria-label={`${ACTION_LABELS[action.kind]}${to ? ` to ${to}` : ""}`}
+      className="animate-fade-in p-5 transition-shadow duration-200 ease-standard focus-within:shadow-elevated md:p-6"
+    >
+      <>
+        <header className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          <span className="inline-flex h-6 items-center rounded-full bg-surface-secondary px-2.5 text-meta font-medium text-ink-secondary">
+            {ACTION_LABELS[action.kind]}
+          </span>
+          {to && <span className="min-w-0 truncate text-body text-ink-secondary">to {to}</span>}
+          <time dateTime={action.createdAt} className="ml-auto text-meta text-ink-tertiary">
+            {new Date(action.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+          </time>
+        </header>
 
-      <p className="mt-2 max-w-[68ch] text-sm leading-relaxed text-ink-soft">{action.rationale}</p>
+        <p className="mt-3 max-w-[68ch] text-label font-normal text-ink-tertiary">{action.rationale}</p>
 
-      <textarea
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        rows={Math.min(14, body.split("\n").length + 2)}
-        className="mt-4 w-full max-w-[72ch] resize-y rounded-md border border-paper-edge bg-white px-4 py-3 text-sm leading-relaxed text-ink"
-        aria-label="Message text, editable before you approve it"
-      />
+        <Textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          rows={Math.min(14, body.split("\n").length + 2)}
+          className="mt-4 resize-y"
+          aria-label="Message text, editable before you approve it"
+        />
 
-      {action.citations.length > 0 && (
-        <p className="mt-2 text-xs text-ink-soft">
-          Priced from {action.citations.map((c) => c.documentTitle).join(", ")}
-        </p>
-      )}
+        {action.citations.length > 0 && (
+          <p className="mt-2 text-meta text-ink-tertiary">
+            Priced from {action.citations.map((c) => c.documentTitle).join(", ")}
+          </p>
+        )}
 
-      <div className="mt-4 flex items-center gap-3">
-        <button
-          onClick={() => onApprove(action, body)}
-          className="rounded-md bg-gold px-4 py-2 text-sm font-medium text-navy-900 hover:bg-gold-deep hover:text-paper"
-        >
-          {verb.do}
-        </button>
-        <button
-          onClick={() => setDeclining((v) => !v)}
-          className="rounded-md px-3 py-2 text-sm text-ink-soft hover:text-ink"
-        >
-          Skip
-        </button>
-      </div>
-
-      {declining && (
-        <div className="mt-3 flex max-w-[72ch] gap-2">
-          <input
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="What was wrong with it?"
-            className="flex-1 rounded-md border border-paper-edge bg-white px-3 py-2 text-sm"
-          />
-          <button
-            onClick={() => onDecline(action, reason)}
-            className="rounded-md border border-paper-edge px-3 py-2 text-sm text-ink-soft hover:text-ink"
+        <div className="mt-4 flex items-center justify-end gap-2 max-md:flex-col-reverse max-md:items-stretch">
+          <Button
+            variant="tertiary"
+            onClick={() => setDeclining((v) => !v)}
+            aria-expanded={declining}
+            disabled={busy !== null}
           >
-            Skip it
-          </button>
+            Skip
+          </Button>
+          <Button
+            variant="primary"
+            loading={busy === "approve"}
+            disabled={busy === "decline"}
+            onClick={() => void run("approve", () => onApprove(action, body))}
+          >
+            {verb.do}
+          </Button>
         </div>
-      )}
-    </article>
+
+        {declining && (
+          <div className="mt-3 flex animate-fade-in gap-2 max-md:flex-col">
+            <Input
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="What was wrong with it? (optional)"
+              aria-label="Why you're skipping this"
+              className="flex-1"
+            />
+            <Button
+              variant="secondary"
+              loading={busy === "decline"}
+              disabled={busy === "approve"}
+              onClick={() => void run("decline", () => onDecline(action, reason))}
+            >
+              Skip it
+            </Button>
+          </div>
+        )}
+      </>
+    </Card>
   );
 }
