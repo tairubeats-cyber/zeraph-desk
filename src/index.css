@@ -39,6 +39,9 @@
   --accent-soft: rgba(0, 102, 204, 0.1);
   --accent-ring: rgba(0, 102, 204, 0.28);
 
+  /* Chart marks that must stay quiet next to the accent (spending bars, tracks). 3:1 on white. */
+  --chart-muted: #8e8e93;
+
   --success: #1b7430;
   --success-soft: rgba(27, 116, 48, 0.1);
   --warning: #a34a00;

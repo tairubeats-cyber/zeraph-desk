@@ -10,6 +10,8 @@ import type { Action, ActionKind, ActionPayload, ActionStatus } from "./actions"
 import type { Contact, Thread, Channel, Message } from "./types";
 import { type BusinessFacts, EMPTY_FACTS } from "./facts";
 import { type Event, type EventKind, newEvent } from "./events";
+import type { Category, CategoryKind, TransactionOverride } from "./finance/types";
+import { DEFAULT_CATEGORIES } from "./finance/categories";
 import { FIXTURE_ACTIONS, FIXTURE_CONTACTS, FIXTURE_THREADS } from "./fixtures";
 
 const DB_PATH = "sqlite:zeraph.db";
@@ -66,6 +68,21 @@ interface MessageRow {
   sent_at: string;
   from_action_id: string | null;
   message_id: string | null;
+}
+
+interface CategoryRow {
+  id: string;
+  name: string;
+  kind: string;
+  position: number;
+  hidden: number;
+}
+
+interface OverrideRow {
+  tx_id: string;
+  category_id: string | null;
+  note: string;
+  flagged: number;
 }
 
 function rowToContact(r: ContactRow): Contact {
@@ -432,6 +449,61 @@ export const db = {
       `INSERT INTO settings (key, value) VALUES ($1, $2)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
       [SEAT_TOKEN_KEY, token],
+    );
+  },
+
+  // --- Finance. Only the user's own choices are stored; account and transaction data comes from a provider. ---
+
+  /** The user's categories. First call writes the defaults, after which the database is the source of truth. */
+  async finCategories(): Promise<Category[]> {
+    const handle = await open();
+    let rows = await handle.select<CategoryRow[]>("SELECT * FROM fin_categories ORDER BY position ASC");
+    if (rows.length === 0) {
+      for (const [i, c] of DEFAULT_CATEGORIES.entries()) {
+        await handle.execute(
+          "INSERT INTO fin_categories (id, name, kind, position, hidden) VALUES ($1, $2, $3, $4, 0)",
+          [c.id, c.name, c.kind, i],
+        );
+      }
+      rows = await handle.select<CategoryRow[]>("SELECT * FROM fin_categories ORDER BY position ASC");
+    }
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      kind: r.kind as CategoryKind,
+      position: r.position,
+      hidden: r.hidden === 1,
+    }));
+  },
+
+  async saveCategory(c: Category): Promise<void> {
+    const handle = await open();
+    await handle.execute(
+      `INSERT INTO fin_categories (id, name, kind, position, hidden) VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT(id) DO UPDATE SET name = excluded.name, kind = excluded.kind,
+         position = excluded.position, hidden = excluded.hidden`,
+      [c.id, c.name, c.kind, c.position, c.hidden ? 1 : 0],
+    );
+  },
+
+  async finOverrides(): Promise<TransactionOverride[]> {
+    const handle = await open();
+    const rows = await handle.select<OverrideRow[]>("SELECT * FROM fin_tx_overrides");
+    return rows.map((r) => ({
+      txId: r.tx_id,
+      categoryId: r.category_id,
+      note: r.note,
+      flagged: r.flagged === 1,
+    }));
+  },
+
+  async saveOverride(o: TransactionOverride): Promise<void> {
+    const handle = await open();
+    await handle.execute(
+      `INSERT INTO fin_tx_overrides (tx_id, category_id, note, flagged, updated_at) VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT(tx_id) DO UPDATE SET category_id = excluded.category_id, note = excluded.note,
+         flagged = excluded.flagged, updated_at = excluded.updated_at`,
+      [o.txId, o.categoryId, o.note, o.flagged ? 1 : 0, new Date().toISOString()],
     );
   },
 

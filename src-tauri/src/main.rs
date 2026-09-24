@@ -18,6 +18,12 @@ fn main() {
             sql: include_str!("../migrations/002_message_id.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 3,
+            description: "finance categories and transaction overrides",
+            sql: include_str!("../migrations/003_finance.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

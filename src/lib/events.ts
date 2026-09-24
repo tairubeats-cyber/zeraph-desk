@@ -13,7 +13,8 @@ export type EventKind =
   | "action_declined"
   | "action_sent"
   | "action_failed"
-  | "document_indexed";
+  | "document_indexed"
+  | "transaction_recategorized";
 
 export interface Event {
   id: ID;

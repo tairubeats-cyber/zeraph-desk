@@ -1,7 +1,7 @@
 import React, { useId } from "react";
 import { cn } from "@/lib/utils";
 
-const CONTROL =
+export const CONTROL =
   "w-full rounded-control border border-line bg-surface-secondary px-3 text-body text-ink " +
   "placeholder:text-ink-tertiary transition-[border-color,background-color,box-shadow] duration-150 ease-standard " +
   "focus:border-accent focus:bg-surface focus:shadow-ring focus:outline-none " +

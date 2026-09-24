@@ -1,5 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { Sidebar, type ViewKey } from "./components/Sidebar";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { DESK_VIEWS, Sidebar, type ViewKey } from "./components/Sidebar";
+import { Overview } from "./views/Overview";
+import { Transactions } from "./views/Transactions";
+import { Accounts } from "./views/Accounts";
 import { Queue } from "./views/Queue";
 import { History } from "./views/History";
 import { Facts } from "./views/Facts";
@@ -9,18 +12,59 @@ import type { Action } from "./lib/actions";
 import { type BusinessFacts, EMPTY_FACTS } from "./lib/facts";
 import { emailConnector } from "./connectors/email";
 import { syncInbox, proposeFollowUps } from "./lib/sync";
+import { useFinance } from "./lib/finance/useFinance";
+import type { TxFilters } from "./lib/finance/filters";
 
 const SYNC_INTERVAL_MS = 60_000;
+const FINANCE_VIEWS: ViewKey[] = ["overview", "transactions", "accounts"];
 /** Matches the `toast` animation length in tailwind.config.js. */
 const TOAST_MS = 2600;
 
+const DESK_TABS: { key: ViewKey; label: string }[] = [
+  { key: "queue", label: "Waiting on you" },
+  { key: "history", label: "Sent" },
+  { key: "facts", label: "Your business" },
+];
+
+/** On a phone the three desk views share one tab, so they need a way to reach each other. */
+function DeskTabs({ current, onSelect }: { current: ViewKey; onSelect: (v: ViewKey) => void }) {
+  return (
+    <div role="group" aria-label="Desk" className="mb-5 flex gap-1 rounded-control bg-surface-secondary p-1 md:hidden">
+      {DESK_TABS.map((t) => (
+        <button
+          key={t.key}
+          onClick={() => onSelect(t.key)}
+          aria-pressed={t.key === current}
+          className="h-9 flex-1 rounded-lg text-label text-ink-secondary transition-colors duration-150 ease-standard aria-pressed:bg-surface aria-pressed:text-ink aria-pressed:shadow-card"
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function App() {
-  const [view, setView] = useState<ViewKey>("queue");
+  const [view, setView] = useState<ViewKey>("overview");
+  const [txPreset, setTxPreset] = useState<Partial<TxFilters> | undefined>();
   const [pending, setPending] = useState<Action[]>([]);
   const [past, setPast] = useState<Action[]>([]);
   const [facts, setFacts] = useState<BusinessFacts>(EMPTY_FACTS);
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  const flash = useCallback((message: string) => {
+    clearTimeout(toastTimer.current);
+    setToast({ id: Date.now(), text: message });
+    toastTimer.current = setTimeout(() => setToast(null), TOAST_MS);
+  }, []);
+
+  const finance = useFinance(flash);
+
+  function open(next: ViewKey, filters?: Partial<TxFilters>) {
+    setTxPreset(filters);
+    setView(next);
+  }
 
   async function refresh() {
     setPending(await db.pendingActions());
@@ -50,12 +94,6 @@ export default function App() {
       clearInterval(interval);
     };
   }, []);
-
-  function flash(message: string) {
-    clearTimeout(toastTimer.current);
-    setToast({ id: Date.now(), text: message });
-    toastTimer.current = setTimeout(() => setToast(null), TOAST_MS);
-  }
 
   async function approve(action: Action, body: string) {
     const edited: Action = {
@@ -115,10 +153,20 @@ export default function App() {
         Skip to content
       </a>
 
-      <Sidebar current={view} pendingCount={pending.length} onSelect={setView} />
+      <Sidebar current={view} pendingCount={pending.length} onSelect={(v) => open(v)} />
 
       <main id="main" tabIndex={-1} className="min-w-0 flex-1 overflow-y-auto focus:outline-none">
-        <div key={view} className="mx-auto w-full max-w-[760px] animate-view-in px-4 py-6 md:px-8 md:py-10">
+        <div
+          key={view}
+          className={
+            "mx-auto w-full animate-view-in px-4 py-6 md:px-8 md:py-10 " +
+            (FINANCE_VIEWS.includes(view) ? "max-w-[1120px]" : "max-w-[760px]")
+          }
+        >
+          {DESK_VIEWS.includes(view) && <DeskTabs current={view} onSelect={(v) => open(v)} />}
+          {view === "overview" && <Overview finance={finance} onOpen={open} />}
+          {view === "transactions" && <Transactions finance={finance} preset={txPreset} />}
+          {view === "accounts" && <Accounts finance={finance} />}
           {view === "queue" && <Queue actions={pending} onApprove={approve} onDecline={decline} />}
           {view === "history" && <History actions={past} />}
           {view === "facts" && (

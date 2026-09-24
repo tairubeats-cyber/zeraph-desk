@@ -31,6 +31,7 @@ export default {
         success: { DEFAULT: "var(--success)", soft: "var(--success-soft)" },
         warning: { DEFAULT: "var(--warning)", soft: "var(--warning-soft)" },
         danger: { DEFAULT: "var(--danger)", soft: "var(--danger-soft)" },
+        chart: { muted: "var(--chart-muted)" },
         hud: { DEFAULT: "var(--hud)", text: "var(--hud-text)" },
       },
       fontFamily: {
@@ -46,6 +47,7 @@ export default {
       },
       // Hierarchy by size, weight and spacing — never past 600.
       fontSize: {
+        display: ["2.75rem", { lineHeight: "1", letterSpacing: "-0.03em", fontWeight: "600" }],
         title: ["1.75rem", { lineHeight: "2.125rem", letterSpacing: "-0.022em", fontWeight: "600" }],
         heading: ["1.0625rem", { lineHeight: "1.5rem", letterSpacing: "-0.012em", fontWeight: "600" }],
         body: ["0.875rem", { lineHeight: "1.375rem" }],
@@ -74,8 +76,9 @@ export default {
         },
       },
       animation: {
-        "view-in": "view-in 220ms var(--ease) both",
-        "fade-in": "fade-in 150ms var(--ease) both",
+        // `backwards`, not `both`: a filled transform would trap position:fixed descendants (the transaction sheet) inside the view.
+        "view-in": "view-in 220ms var(--ease) backwards",
+        "fade-in": "fade-in 150ms var(--ease) backwards",
         toast: "toast 2600ms var(--ease) forwards",
       },
     },
