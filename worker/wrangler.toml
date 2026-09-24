@@ -7,7 +7,7 @@ compatibility_date = "2026-09-17"
 # meter and gate requests, all under one namespace since scale is a handful
 # of customers, not a platform.
 kv_namespaces = [
-  { binding = "ZERAPH_KV", id = "REPLACE_WITH_KV_NAMESPACE_ID" }
+  { binding = "ZERAPH_KV", id = "1fb6bdbb0e4545a6b440e9f8d9ba7ffe" }
 ]
 
 [vars]
