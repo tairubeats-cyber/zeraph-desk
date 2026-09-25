@@ -15,7 +15,7 @@ import type { Finance } from "@/lib/finance/useFinance";
 import { accountTotals, flowForMonth, spendingByCategory } from "@/lib/finance/analysis";
 import { dayOfMonth, formatMoney, monthKey, monthLabel, recentMonthKeys, shiftMonth } from "@/lib/finance/money";
 import type { TxFilters } from "@/lib/finance/filters";
-import type { ViewKey } from "@/components/Sidebar";
+import type { ViewKey } from "@/nav";
 
 interface Props {
   finance: Finance;

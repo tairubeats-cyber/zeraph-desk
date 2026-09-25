@@ -28,7 +28,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-export function Settings() {
+export function Connections() {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [mailOpen, setMailOpen] = useState(false);
@@ -87,7 +87,7 @@ export function Settings() {
 
   return (
     <div>
-      <PageHeader title="Settings" />
+      <PageHeader title="Connections" description="The email account and service seat ZeraphDesk uses." />
 
       <div className="space-y-8">
         <Section title="Email">
@@ -221,20 +221,36 @@ export function Settings() {
           </Card>
         </Section>
 
-        <Section title="Your business">
-          <Card className="p-5 md:p-6">
+      </div>
+    </div>
+  );
+}
+
+export function Security() {
+  return (
+    <div>
+      <PageHeader title="Security" description="What stays on this computer, and what leaves it." />
+
+      <div className="space-y-8">
+        <Section title="What leaves this computer">
+          <Card className="space-y-3 p-5 md:p-6">
             <p className="max-w-[56ch] text-body text-ink-secondary">
-              Name, service area, hours, and how you sign off. Every draft uses these.
+              Email: your documents stay on this machine. To write a reply, Desk sends the message it's answering
+              and the few lines it pulled from your files. Nothing else is uploaded, and nothing is used to
+              train a model.
+            </p>
+            <p className="max-w-[56ch] text-body text-ink-secondary">
+              Finance: nothing. The finance screens don't connect to a bank or to any service yet, and the
+              figures you see are sample data.
             </p>
           </Card>
         </Section>
 
-        <Section title="What leaves this computer">
+        <Section title="Where things are kept">
           <Card className="p-5 md:p-6">
             <p className="max-w-[56ch] text-body text-ink-secondary">
-              Your documents stay on this machine. To write a reply, Desk sends the message it's answering
-              and the few lines it pulled from your files. Nothing else is uploaded, and nothing is used
-              to train a model.
+              Your email app password is held in this computer's keychain. Everything else, including your
+              categories, notes and drafts, is stored in a database file on this computer.
             </p>
           </Card>
         </Section>

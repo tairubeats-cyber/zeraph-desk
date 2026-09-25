@@ -139,6 +139,14 @@ wording and structure.
 - **Nothing here touches the network yet.** When Intelligence (AI over the user's
   data) is built it goes through the proxy like drafts do, and what's sent needs
   a decision first: the desk rule is "only what the answer needs".
+- **Navigation is one file, `src/nav.ts`.** The sidebar, phone tab bar, section
+  tabs, "All sections" page and the view switch in `App.tsx` all read it. The tree
+  is Overview; Money (Accounts, Transactions, Cash Flow, Bills, Recurring); Planning
+  (Budgets, Goals, Forecast, Scenarios); Wealth (Net Worth, Investments, Debt);
+  Intelligence (Action Center, Ask ZeraphDesk, Activity); Desk (the email product);
+  Settings (Profile, Connections, Security, Preferences). Unbuilt sections stay
+  listed with `built: false` and open a plain "not built yet" page. Building one
+  means flipping that flag, adding its case in `App.tsx`, and nothing else.
 - **Order of work:** phase 1 done (shell, Overview, Accounts, Transactions).
   Then money management (budgets, bills, recurring, cash flow, goals), then
   intelligence (action center, activity, notifications, ask-your-data), then

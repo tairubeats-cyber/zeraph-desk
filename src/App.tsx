@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DESK_VIEWS, Sidebar, type ViewKey } from "./components/Sidebar";
+import { Sidebar } from "./components/Sidebar";
+import { SectionTabs } from "./components/SectionTabs";
+import { findItem, type ViewKey } from "./nav";
+import { AllSections } from "./views/AllSections";
+import { ComingSoon } from "./views/ComingSoon";
 import { Overview } from "./views/Overview";
 import { Transactions } from "./views/Transactions";
 import { Accounts } from "./views/Accounts";
 import { Queue } from "./views/Queue";
 import { History } from "./views/History";
 import { Facts } from "./views/Facts";
-import { Settings } from "./views/Settings";
+import { Connections, Security } from "./views/Settings";
 import { db, newEvent } from "./lib/db";
 import type { Action } from "./lib/actions";
 import { type BusinessFacts, EMPTY_FACTS } from "./lib/facts";
@@ -16,33 +20,8 @@ import { useFinance } from "./lib/finance/useFinance";
 import type { TxFilters } from "./lib/finance/filters";
 
 const SYNC_INTERVAL_MS = 60_000;
-const FINANCE_VIEWS: ViewKey[] = ["overview", "transactions", "accounts"];
 /** Matches the `toast` animation length in tailwind.config.js. */
 const TOAST_MS = 2600;
-
-const DESK_TABS: { key: ViewKey; label: string }[] = [
-  { key: "queue", label: "Waiting on you" },
-  { key: "history", label: "Sent" },
-  { key: "facts", label: "Your business" },
-];
-
-/** On a phone the three desk views share one tab, so they need a way to reach each other. */
-function DeskTabs({ current, onSelect }: { current: ViewKey; onSelect: (v: ViewKey) => void }) {
-  return (
-    <div role="group" aria-label="Desk" className="mb-5 flex gap-1 rounded-control bg-surface-secondary p-1 md:hidden">
-      {DESK_TABS.map((t) => (
-        <button
-          key={t.key}
-          onClick={() => onSelect(t.key)}
-          aria-pressed={t.key === current}
-          className="h-9 flex-1 rounded-lg text-label text-ink-secondary transition-colors duration-150 ease-standard aria-pressed:bg-surface aria-pressed:text-ink aria-pressed:shadow-card"
-        >
-          {t.label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 export default function App() {
   const [view, setView] = useState<ViewKey>("overview");
@@ -60,6 +39,44 @@ export default function App() {
   }, []);
 
   const finance = useFinance(flash);
+
+  const current = findItem(view);
+
+  function renderView() {
+    if (!current.item.built) return <ComingSoon item={current.item} onOverview={() => open("overview")} />;
+    switch (view) {
+      case "overview":
+        return <Overview finance={finance} onOpen={open} />;
+      case "accounts":
+        return <Accounts finance={finance} />;
+      case "transactions":
+        return <Transactions finance={finance} preset={txPreset} />;
+      case "queue":
+        return <Queue actions={pending} onApprove={approve} onDecline={decline} />;
+      case "history":
+        return <History actions={past} />;
+      case "facts":
+        return (
+          <Facts
+            facts={facts}
+            onSave={async (next) => {
+              await db.saveFacts(next);
+              flash("Saved");
+              await refresh();
+            }}
+          />
+        );
+      case "connections":
+        return <Connections />;
+      case "security":
+        return <Security />;
+      case "more":
+        return <AllSections onOpen={open} />;
+      default:
+        // A section marked built in nav.ts with no case here is a wiring mistake, not a blank page.
+        return <ComingSoon item={current.item} onOverview={() => open("overview")} />;
+    }
+  }
 
   function open(next: ViewKey, filters?: Partial<TxFilters>) {
     setTxPreset(filters);
@@ -160,26 +177,11 @@ export default function App() {
           key={view}
           className={
             "mx-auto w-full animate-view-in px-4 py-6 md:px-8 md:py-10 " +
-            (FINANCE_VIEWS.includes(view) ? "max-w-[1120px]" : "max-w-[760px]")
+            (current.group?.narrow || view === "more" ? "max-w-[760px]" : "max-w-[1120px]")
           }
         >
-          {DESK_VIEWS.includes(view) && <DeskTabs current={view} onSelect={(v) => open(v)} />}
-          {view === "overview" && <Overview finance={finance} onOpen={open} />}
-          {view === "transactions" && <Transactions finance={finance} preset={txPreset} />}
-          {view === "accounts" && <Accounts finance={finance} />}
-          {view === "queue" && <Queue actions={pending} onApprove={approve} onDecline={decline} />}
-          {view === "history" && <History actions={past} />}
-          {view === "facts" && (
-            <Facts
-              facts={facts}
-              onSave={async (next) => {
-                await db.saveFacts(next);
-                flash("Saved");
-                await refresh();
-              }}
-            />
-          )}
-          {view === "settings" && <Settings />}
+          <SectionTabs current={view} onSelect={(v) => open(v)} />
+          {renderView()}
         </div>
       </main>
 

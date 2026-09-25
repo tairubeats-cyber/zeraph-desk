@@ -1,16 +1,16 @@
+import { useState } from "react";
+import { ChevronDown, ShieldCheck } from "lucide-react";
 import {
-  Building2,
-  Inbox,
-  LayoutDashboard,
-  ReceiptText,
-  Send,
-  Settings,
-  ShieldCheck,
-  Wallet,
-  type LucideIcon,
-} from "lucide-react";
-
-export type ViewKey = "overview" | "transactions" | "accounts" | "queue" | "history" | "facts" | "settings";
+  GROUPS,
+  MORE,
+  OVERVIEW,
+  groupOf,
+  landingFor,
+  type NavGroup,
+  type NavItem,
+  type ViewKey,
+} from "@/nav";
+import { cn } from "@/lib/utils";
 
 interface Props {
   current: ViewKey;
@@ -18,71 +18,94 @@ interface Props {
   onSelect: (view: ViewKey) => void;
 }
 
-interface Item {
-  key: ViewKey;
-  label: string;
-  icon: LucideIcon;
+const COLLAPSED_KEY = "zeraphdesk.nav.collapsed";
+
+/** Which groups the user folded away. A per-person convenience, so it lives in the browser, and the app works without it. */
+function loadCollapsed(): string[] {
+  try {
+    const raw = localStorage.getItem(COLLAPSED_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((k): k is string => typeof k === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
-const OVERVIEW: Item = { key: "overview", label: "Overview", icon: LayoutDashboard };
-const SETTINGS: Item = { key: "settings", label: "Settings", icon: Settings };
-
-const GROUPS: { heading: string; items: Item[] }[] = [
-  {
-    heading: "Money",
-    items: [
-      { key: "transactions", label: "Transactions", icon: ReceiptText },
-      { key: "accounts", label: "Accounts", icon: Wallet },
-    ],
-  },
-  {
-    heading: "Desk",
-    items: [
-      { key: "queue", label: "Waiting on you", icon: Inbox },
-      { key: "history", label: "Sent", icon: Send },
-      { key: "facts", label: "Your business", icon: Building2 },
-    ],
-  },
-];
-
-/** The email desk is three views; on a phone they share one tab and the views link to each other. */
-export const DESK_VIEWS: ViewKey[] = ["queue", "history", "facts"];
+function saveCollapsed(keys: string[]) {
+  try {
+    localStorage.setItem(COLLAPSED_KEY, JSON.stringify(keys));
+  } catch {
+    /* private mode or blocked storage: folding just won't persist */
+  }
+}
 
 const ROW =
-  "relative flex w-full items-center justify-center gap-3 rounded-control text-ink-secondary " +
+  "relative flex w-full items-center justify-center gap-3 rounded-control " +
   "transition-colors duration-150 ease-standard hover:bg-black/5 " +
   "aria-[current=page]:bg-black/[0.07] aria-[current=page]:text-ink";
 
+/** The phone tab bar: the four sections you reach for most, then everything else. */
+const PHONE_TABS: { label: string; icon: NavItem["icon"]; target: ViewKey; groupKey?: string }[] = [
+  { label: OVERVIEW.label, icon: OVERVIEW.icon, target: "overview" },
+  ...["money", "planning", "intelligence"].map((key) => {
+    const g = GROUPS.find((x) => x.key === key) as NavGroup;
+    return { label: g.label, icon: g.icon, target: landingFor(g), groupKey: key };
+  }),
+  { label: "More", icon: MORE.icon, target: "more" },
+];
+
 /**
- * Full sidebar on wide windows, icon rail on medium ones, a bottom tab bar on
- * phone widths. Labels stay in the DOM at every size so screen readers get them.
+ * Full sidebar on wide windows, icon rail on medium ones, bottom tab bar on
+ * phone widths. Labels stay in the DOM at every size so screen readers get
+ * them. The list scrolls, so the full tree fits any window height.
  */
 export function Sidebar({ current, pendingCount, onSelect }: Props) {
-  const badge = (item: Item) => item.key === "queue" && pendingCount > 0;
+  const [collapsed, setCollapsed] = useState<string[]>(loadCollapsed);
+  const currentGroup = groupOf(current);
 
-  // A render helper, not a component: a nested component would remount on every render and drop keyboard focus.
-  function sideItem(item: Item) {
-    const active = item.key === current;
-    const Icon = item.icon;
+  function toggle(key: string) {
+    setCollapsed((prev) => {
+      const next = prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
+      saveCollapsed(next);
+      return next;
+    });
+  }
+
+  const badge = (item: NavItem) => item.key === "queue" && pendingCount > 0;
+
+  // Render helpers, not components: a nested component would remount on every render and drop keyboard focus.
+  function item(it: NavItem) {
+    const active = it.key === current;
+    const Icon = it.icon;
     return (
-      <li key={item.key}>
+      <li key={it.key}>
         <button
-          onClick={() => onSelect(item.key)}
+          onClick={() => onSelect(it.key)}
           aria-current={active ? "page" : undefined}
-          title={item.label}
-          className={ROW + " h-10 px-0 text-body lg:justify-start lg:px-3"}
+          title={it.built ? it.label : `${it.label} (not built yet)`}
+          className={cn(
+            ROW,
+            "h-10 px-0 text-body lg:h-9 lg:justify-start lg:px-3",
+            it.built ? "text-ink-secondary" : "text-ink-tertiary",
+          )}
         >
           <span className="relative">
-            <Icon className={"h-[18px] w-[18px] " + (active ? "text-accent" : "")} strokeWidth={1.75} aria-hidden="true" />
-            {badge(item) && (
+            <Icon className={cn("h-[18px] w-[18px]", active && "text-accent")} strokeWidth={1.75} aria-hidden="true" />
+            {badge(it) && (
               <span
                 aria-hidden="true"
                 className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-accent ring-2 ring-sidebar lg:hidden"
               />
             )}
           </span>
-          <span className="sr-only lg:not-sr-only">{item.label}</span>
-          {badge(item) && (
+          <span className="sr-only lg:not-sr-only lg:min-w-0 lg:truncate lg:whitespace-nowrap lg:text-left">{it.label}</span>
+          {!it.built && <span className="sr-only">, not built yet</span>}
+          {!it.built && (
+            <span aria-hidden="true" className="ml-auto hidden shrink-0 pl-2 text-meta lg:inline">
+              Soon
+            </span>
+          )}
+          {badge(it) && (
             <>
               <span aria-hidden="true" className="ml-auto hidden text-label tabular-nums text-ink-tertiary lg:inline">
                 {pendingCount}
@@ -95,27 +118,51 @@ export function Sidebar({ current, pendingCount, onSelect }: Props) {
     );
   }
 
-  const phoneItems: Item[] = [
-    OVERVIEW,
-    { key: "transactions", label: "Transactions", icon: ReceiptText },
-    { key: "accounts", label: "Accounts", icon: Wallet },
-    { key: "queue", label: "Desk", icon: Inbox },
-    SETTINGS,
-  ];
-  const tabs = phoneItems.map((item) => ({
-    item,
-    target: item.key,
-    active: item.key === "queue" ? DESK_VIEWS.includes(current) : item.key === current,
-  }));
+  function group(g: NavGroup) {
+    const containsCurrent = currentGroup?.key === g.key;
+    const open = containsCurrent || !collapsed.includes(g.key);
+    const hasPending = g.items.some(badge);
+    return (
+      <div key={g.key} className="mt-3 border-t border-line pt-2 lg:border-t-0 lg:pt-0">
+        <button
+          onClick={() => toggle(g.key)}
+          aria-expanded={open}
+          // Folding the group you're standing in would hide where you are.
+          disabled={containsCurrent}
+          className="hidden w-full items-center gap-1 rounded-control px-3 pb-1 pt-1.5 text-meta font-medium text-ink-tertiary transition-colors duration-150 ease-standard enabled:hover:text-ink lg:flex"
+        >
+          <span>{g.label}</span>
+          {!open && hasPending && (
+            <>
+              <span aria-hidden="true" className="ml-1 h-1.5 w-1.5 rounded-full bg-accent" />
+              <span className="sr-only">, {pendingCount} waiting</span>
+            </>
+          )}
+          <ChevronDown
+            className={cn("ml-auto h-3.5 w-3.5 transition-transform duration-150 ease-standard", !open && "-rotate-90")}
+            strokeWidth={1.75}
+            aria-hidden="true"
+          />
+        </button>
+        <ul className={cn("flex flex-col gap-0.5", !open && "lg:hidden")}>{g.items.map(item)}</ul>
+      </div>
+    );
+  }
+
+  const phoneActive = (t: (typeof PHONE_TABS)[number]) => {
+    if (t.target === "overview") return current === "overview";
+    if (t.target === "more") return current === "more" || (currentGroup ? !["money", "planning", "intelligence"].includes(currentGroup.key) : false);
+    return currentGroup?.key === t.groupKey;
+  };
 
   return (
     <>
       {/* Wide and medium windows */}
       <nav
         aria-label="Main"
-        className="hidden h-full w-16 shrink-0 select-none flex-col border-r border-line bg-sidebar px-2.5 py-4 md:flex lg:w-60 lg:px-3"
+        className="hidden h-full w-16 shrink-0 select-none flex-col border-r border-line bg-sidebar px-2.5 py-4 md:flex lg:w-64 lg:px-3"
       >
-        <div className="flex items-center gap-2.5 px-1.5 pb-5 lg:px-2.5">
+        <div className="flex items-center gap-2.5 px-1.5 pb-4 lg:px-2.5">
           <div
             aria-hidden="true"
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-ink text-[13px] font-semibold text-white"
@@ -125,22 +172,11 @@ export function Sidebar({ current, pendingCount, onSelect }: Props) {
           <span className="hidden text-heading text-ink lg:inline">ZeraphDesk</span>
         </div>
 
-        <ul className="flex flex-col gap-0.5">
-          {sideItem(OVERVIEW)}
-        </ul>
+        <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
+          <ul className="flex flex-col gap-0.5">{item(OVERVIEW)}</ul>
+          {GROUPS.map(group)}
+        </div>
 
-        {GROUPS.map((group) => (
-          <div key={group.heading} className="mt-4 border-t border-line pt-3 lg:border-t-0 lg:pt-0">
-            <h2 className="hidden px-3 pb-1 text-meta font-medium text-ink-tertiary lg:block">{group.heading}</h2>
-            <ul className="flex flex-col gap-0.5">
-              {group.items.map(sideItem)}
-            </ul>
-          </div>
-        ))}
-
-        <ul className="mt-auto flex flex-col gap-0.5 pt-4">
-          {sideItem(SETTINGS)}
-        </ul>
         <div className="hidden items-start gap-2 px-3 pt-4 text-meta text-ink-tertiary lg:flex">
           <ShieldCheck className="mt-px h-3.5 w-3.5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
           <span>Nothing sends until you approve it.</span>
@@ -152,23 +188,24 @@ export function Sidebar({ current, pendingCount, onSelect }: Props) {
         aria-label="Main"
         className="flex h-16 shrink-0 select-none items-stretch justify-around gap-1 border-t border-line bg-sidebar px-2 md:hidden"
       >
-        {tabs.map(({ item, active, target }) => {
-          const Icon = item.icon;
+        {PHONE_TABS.map((t) => {
+          const Icon = t.icon;
+          const active = phoneActive(t);
           return (
             <button
-              key={item.key}
-              onClick={() => onSelect(target)}
+              key={t.label}
+              onClick={() => onSelect(t.target)}
               aria-current={active ? "page" : undefined}
-              className={ROW + " flex-1 flex-col gap-0.5 px-1 text-[11px] font-medium"}
+              className={cn(ROW, "flex-1 flex-col gap-0.5 px-1 text-[11px] font-medium text-ink-secondary")}
             >
               <span className="relative">
-                <Icon className={"h-[18px] w-[18px] " + (active ? "text-accent" : "")} strokeWidth={1.75} aria-hidden="true" />
-                {badge(item) && (
+                <Icon className={cn("h-[18px] w-[18px]", active && "text-accent")} strokeWidth={1.75} aria-hidden="true" />
+                {t.target === "more" && pendingCount > 0 && (
                   <span aria-hidden="true" className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-accent ring-2 ring-sidebar" />
                 )}
               </span>
-              {item.label}
-              {badge(item) && <span className="sr-only">, {pendingCount} waiting</span>}
+              {t.label}
+              {t.target === "more" && pendingCount > 0 && <span className="sr-only">, {pendingCount} waiting</span>}
             </button>
           );
         })}
