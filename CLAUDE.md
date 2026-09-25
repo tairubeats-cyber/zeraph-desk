@@ -68,6 +68,9 @@ Do not start a later phase before the one before it works end to end.
   is too vague.
 - Copy: sentence case, active voice, name what happens. "Send reply", not
   "Submit". The button's verb matches the toast that follows it.
+- Never report something that didn't happen. A reply is only "sent" if the mail
+  server accepted it. With no email account connected, or if sending fails, it
+  stays in the queue with the owner's edits and the screen says why.
 
 ## Design language
 

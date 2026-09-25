@@ -35,6 +35,7 @@ export default function App() {
   const [pending, setPending] = useState<Action[]>([]);
   const [past, setPast] = useState<Action[]>([]);
   const [facts, setFacts] = useState<BusinessFacts>(EMPTY_FACTS);
+  const [mailConnected, setMailConnected] = useState<boolean | null>(null);
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -69,7 +70,15 @@ export default function App() {
       case "goals":
         return <Goals finance={finance} plans={plans} />;
       case "queue":
-        return <Queue actions={pending} onApprove={approve} onDecline={decline} />;
+        return (
+          <Queue
+            actions={pending}
+            mailConnected={mailConnected}
+            onConnect={() => open("connections")}
+            onApprove={approve}
+            onDecline={decline}
+          />
+        );
       case "history":
         return <History actions={past} />;
       case "facts":
@@ -100,7 +109,20 @@ export default function App() {
     setView(next);
   }
 
+  /** Whether an email account is set up. Anything that fails to answer counts as not connected. */
+  async function checkMail(): Promise<boolean> {
+    let connected = false;
+    try {
+      connected = await emailConnector.isConnected();
+    } catch {
+      connected = false;
+    }
+    setMailConnected(connected);
+    return connected;
+  }
+
   async function refresh() {
+    void checkMail();
     setPending(await db.pendingActions());
     setPast(await db.recentActions());
     setFacts(await db.facts());
@@ -109,6 +131,10 @@ export default function App() {
   useEffect(() => {
     void refresh();
   }, []);
+
+  useEffect(() => {
+    if (view === "queue") void checkMail();
+  }, [view]);
 
   useEffect(() => {
     let cancelled = false;
@@ -130,6 +156,13 @@ export default function App() {
   }, []);
 
   async function approve(action: Action, body: string) {
+    // Never claim a reply went out when there's nothing to send it with. The reply stays in the
+    // queue, untouched, and the card keeps whatever was typed.
+    if (emailConnector.canSend(action) && !(await checkMail())) {
+      flash("Connect your email under Connections to send this. It's still in your queue.");
+      return;
+    }
+
     const edited: Action = {
       ...action,
       payload: { ...action.payload, body } as Action["payload"],
@@ -140,9 +173,7 @@ export default function App() {
     await db.log(newEvent("action_approved", action.id, { kind: action.kind }));
 
     try {
-      if (emailConnector.canSend(edited) && (await emailConnector.isConnected())) {
-        await emailConnector.send(edited);
-      }
+      if (emailConnector.canSend(edited)) await emailConnector.send(edited);
       await db.updateAction(action.id, { status: "sent" });
       await db.log(newEvent("action_sent", action.id, { kind: action.kind }));
       flash("Reply sent");
