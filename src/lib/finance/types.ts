@@ -133,6 +133,10 @@ export interface FinancialSnapshot {
   transactions: Transaction[];
   /** Past balances, when the provider has them. Empty otherwise. */
   balanceHistory: BalancePoint[];
+  /** Individual holdings inside investment accounts, when the provider has them. */
+  positions: Position[];
+  /** Contributions, withdrawals and dividends in investment accounts. */
+  investmentActivity: InvestmentActivity[];
 }
 
 /**
@@ -365,4 +369,66 @@ export interface Scenario {
   changes: ScenarioChange[];
   createdAt: string;
   updatedAt: string;
+}
+
+// --- Phase 5: wealth -------------------------------------------------------------
+
+export type AssetClass = "us_stock" | "intl_stock" | "bond" | "cash" | "other";
+
+export const ASSET_CLASSES: Record<AssetClass, string> = {
+  us_stock: "U.S. stocks",
+  intl_stock: "International stocks",
+  bond: "Bonds",
+  cash: "Cash",
+  other: "Other",
+};
+
+/** A fund holds many things; a stock is one company; cash is cash. Concentration only matters for single stocks. */
+export type PositionType = "fund" | "stock" | "cash";
+
+/**
+ * One holding inside an investment account, as a provider reports it. The value
+ * is `quantity` times `priceCents`; a provider that only knows the value uses a
+ * quantity of 1. Quantities can be fractional.
+ */
+export interface Position {
+  id: string;
+  accountId: string;
+  symbol: string;
+  name: string;
+  type: PositionType;
+  assetClass: AssetClass;
+  quantity: number;
+  /** Latest price per unit, in cents. */
+  priceCents: number;
+  /** Price per unit at the previous close, for the day's change. */
+  previousCloseCents: number;
+  /** What was paid in total, when the provider knows. Retirement plans often don't say. */
+  costBasisCents: number | null;
+}
+
+/**
+ * Money moving into or out of an investment account, as a provider reports it.
+ * Dividends are returns, not contributions: they're listed but never counted as money you put in.
+ */
+export interface InvestmentActivity {
+  id: string;
+  accountId: string;
+  date: string;
+  kind: "contribution" | "withdrawal" | "dividend";
+  /** Always positive. */
+  amountCents: number;
+}
+
+/** What the person assumes for a long-term projection. Entered by them, never guessed by us. */
+export interface LongTermAssumptions {
+  /** Added each month. null means "use my recent pace". */
+  monthlyCents: number | null;
+  /** Expected yearly growth, in basis points (5% is 500). */
+  returnBps: number;
+  years: number;
+  /** An amount to reach, if any. */
+  targetCents: number | null;
+  /** Yearly inflation in basis points, for showing today's-money values. 0 shows plain future dollars. */
+  inflationBps: number;
 }

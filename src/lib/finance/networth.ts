@@ -86,7 +86,7 @@ export const SLICE_LABELS: Record<Slice, string> = {
 const SLICE_ORDER: Slice[] = ["cash", "investments", "other_assets", "credit", "loans", "other_debt"];
 
 /** Per account, its history sorted oldest first, or an empty list. */
-function historyByAccount(history: BalancePoint[]): Map<string, BalancePoint[]> {
+export function historyByAccount(history: BalancePoint[]): Map<string, BalancePoint[]> {
   const by = new Map<string, BalancePoint[]>();
   for (const p of history) {
     const list = by.get(p.accountId);
@@ -102,6 +102,26 @@ export function historyStart(history: BalancePoint[]): string | null {
   let earliest: string | null = null;
   for (const p of history) if (earliest === null || p.date < earliest) earliest = p.date;
   return earliest;
+}
+
+/**
+ * A lookup for "what was this account's balance on this date", by the one rule
+ * in the header. Dates must be asked for in ascending order per account (it keeps
+ * a cursor so walking a long series stays linear).
+ */
+export function balanceLookup(
+  by: Map<string, BalancePoint[]>,
+  today: string,
+): (a: FinancialAccount, date: string) => number {
+  const cursors = new Map<string, number>();
+  return (a, date) => {
+    const list = by.get(a.id);
+    if (!list || list.length === 0 || date >= today) return a.balanceCents;
+    let i = cursors.get(a.id) ?? 0;
+    while (i + 1 < list.length && list[i + 1].date <= date) i++;
+    cursors.set(a.id, i);
+    return list[i].date <= date ? list[i].balanceCents : list[0].balanceCents;
+  };
 }
 
 export interface Range {
@@ -152,17 +172,7 @@ export function netWorthHistory(
   const from = dataStart && requested < dataStart ? dataStart : requested;
   const clipped = range.days !== null && dataStart !== null && requested < dataStart;
 
-  // A cursor per account, so walking the days forward stays linear.
-  const cursors = new Map<string, number>();
-  const balanceOn = (a: FinancialAccount, date: string): number => {
-    const list = by.get(a.id);
-    if (!list || list.length === 0 || date >= today) return a.balanceCents;
-    let i = cursors.get(a.id) ?? 0;
-    // Never step back: dates only go forward in this walk.
-    while (i + 1 < list.length && list[i + 1].date <= date) i++;
-    cursors.set(a.id, i);
-    return list[i].date <= date ? list[i].balanceCents : list[0].balanceCents;
-  };
+  const balanceOn = balanceLookup(by, today);
 
   const sliceOf = (a: FinancialAccount): Slice => ACCOUNT_KINDS[a.kind].group;
   const slicesAt = (date: string): Map<Slice, number> => {

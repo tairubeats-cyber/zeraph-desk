@@ -22,16 +22,21 @@ import type {
   Goal,
   GoalContribution,
   Holding,
+  InvestmentActivity,
+  LongTermAssumptions,
   PlannedItem,
+  Position,
   RecurringPayment,
   ResolvedTransaction,
 } from "./types";
-import { ACCOUNT_GROUPS, ACCOUNT_KINDS } from "./types";
+import { ACCOUNT_GROUPS, ACCOUNT_KINDS, ASSET_CLASSES } from "./types";
 import type { TxFilters } from "./filters";
 import { accountTotals } from "./analysis";
 import { modellableDebts, simulatePayoff } from "./debt";
 import { buildForecast } from "./forecast";
 import { netWorthHistory, netWorthNow, RANGES, SLICE_LABELS } from "./networth";
+import { allocation, concentration, contributionSummary, holdingRows, investmentAccounts, performance, portfolioSummary } from "./investments";
+import { DEFAULT_LONG_TERM, monthsToTarget, projectRange } from "./longterm";
 import { average, completeMonths, monthlyFlows, upcoming } from "./cashflow";
 import { budgetRows } from "./budget";
 import { goalProgress } from "./goals";
@@ -64,6 +69,9 @@ export interface AskContext {
   history: BalancePoint[];
   debtTerms: Map<string, DebtTerms>;
   planned: PlannedItem[];
+  positions: Position[];
+  activity: InvestmentActivity[];
+  longTerm: LongTermAssumptions;
 }
 
 export interface AnswerLink {
@@ -100,6 +108,9 @@ export const SUGGESTED_QUESTIONS = [
   "How has my net worth changed?",
   "Will I run low on cash in the next 30 days?",
   "When will I be debt free?",
+  "How are my investments doing?",
+  "How are my investments split?",
+  "What could my investments be worth in 20 years?",
 ];
 
 // ---------------------------------------------------------------- language
@@ -532,6 +543,100 @@ function netWorthWhy(c: AskContext, q: string): Answer {
   });
 }
 
+/** A share as a percent with a real minus sign, matching how money is written. */
+const rate = (x: number, digits = 1) => `${x < 0 ? "−" : ""}${Math.abs(x * 100).toFixed(digits)}%`;
+
+function portfolioAnswer(c: AskContext, q: string): Answer {
+  const inv = investmentAccounts(c.accounts);
+  if (inv.length === 0) {
+    return frame(c, q, { answered: false, headline: "I can't answer that: there are no investment accounts.", used: [] });
+  }
+  const said = q.toLowerCase();
+  const range = /all time|since (the )?(start|beginning)|overall/.test(said) ? RANGES[5] : /90|three months|quarter/.test(said) ? RANGES[2] : /30|month/.test(said) ? RANGES[1] : RANGES[3];
+  const words = range.days === null ? "all the history there is" : range.days === 365 ? "the last year" : `the last ${range.days} days`;
+  const s = portfolioSummary(c.accounts, c.positions);
+  const contrib = contributionSummary(c.accounts, c.activity, c.today);
+  const p = performance(c.accounts, c.history, c.activity, c.today, range);
+  const facts = [
+    { label: "Value today (reported)", value: formatMoney(s.valueCents) },
+    ...(s.dailyChangeCents === null ? [] : [{ label: "Today's change", value: `${formatMoney(s.dailyChangeCents, { signed: true })}${s.dailyPct === null ? "" : ` (${rate(s.dailyPct, 2)})`}` }]),
+    { label: "Put in, last 12 months", value: formatMoney(contrib.last12Cents) },
+    ...(p ? [{ label: `Growth over ${words}`, value: formatMoney(p.growthCents, { signed: true }) }] : []),
+    ...(p && p.returnPct !== null ? [{ label: "Return (estimate)", value: `${rate(p.returnPct)}${p.annualizedPct !== null ? `, about ${rate(p.annualizedPct)} a year` : ""}` }] : []),
+  ];
+  return frame(c, q, {
+    headline: p
+      ? `Your investments are worth ${formatMoney(s.valueCents)}. Over ${words} they're ${p.growthCents >= 0 ? "up" : "down"} ${formatMoney(Math.abs(p.growthCents))} from growth, after ${formatMoney(p.netContributionsCents)} you put in.`
+      : `Your investments are worth ${formatMoney(s.valueCents)}. I can't say how they've moved: this data doesn't include past balances.`,
+    facts,
+    table: {
+      columns: ["Account", "Value", "Today"],
+      rows: inv.map((a) => {
+        const held = c.positions.filter((x) => x.accountId === a.id);
+        const ch = held.reduce((t, x) => t + Math.round(x.quantity * (x.priceCents - x.previousCloseCents)), 0);
+        return [a.name, formatMoney(a.balanceCents), held.length ? formatMoney(ch, { signed: true, cents: true }) : "n/a"];
+      }),
+    },
+    used: ["Investment account balances and holdings as last reported", ...(p ? [`Balance history and deposits from ${day(p.from)} to today`] : [])],
+    notes: ["Return uses the Modified Dietz method, which counts when money went in. It's an estimate, and it says nothing about what comes next.", ...(p ? p.notes : [])],
+    links: [{ label: "Open investments", view: "investments" }],
+  });
+}
+
+function allocationAnswer(c: AskContext, q: string): Answer {
+  const s = portfolioSummary(c.accounts, c.positions);
+  const slices = allocation(c.accounts, c.positions);
+  if (slices.length === 0 || s.valueCents === 0) {
+    return frame(c, q, { answered: false, headline: "I can't say how your investments are split: there aren't any listed.", used: [] });
+  }
+  const conc = concentration(holdingRows(c.accounts, c.positions));
+  const label = (k: string) => (k === "unclassified" ? "Not broken down" : ASSET_CLASSES[k as keyof typeof ASSET_CLASSES]);
+  const top = slices[0];
+  return frame(c, q, {
+    headline: `${Math.round(top.fraction * 100)}% of your ${formatMoney(s.valueCents)} in investments is ${top.key === "unclassified" ? "in accounts whose holdings aren't listed" : `in ${label(top.key)}`}.`,
+    table: { columns: ["Kind", "Value", "Share"], rows: slices.map((x) => [label(x.key), formatMoney(x.cents), `${(x.fraction * 100).toFixed(1)}%`]) },
+    facts: [
+      ...(conc.largest ? [{ label: "Largest single holding", value: `${conc.largest.position.name}, ${(conc.largest.share * 100).toFixed(1)}%` }] : []),
+      ...(conc.largestStock ? [{ label: "Largest single company", value: `${conc.largestStock.position.name}, ${(conc.largestStock.share * 100).toFixed(1)}%` }] : []),
+    ],
+    used: ["The holdings listed in your investment accounts, at their latest prices"],
+    notes: ["This describes how your money is split. It isn't a view on whether the split suits you, and it isn't advice."],
+    links: [{ label: "Open allocation", view: "investments" }],
+  });
+}
+
+function longTermAnswer(c: AskContext, q: string): Answer {
+  const s = portfolioSummary(c.accounts, c.positions);
+  const contrib = contributionSummary(c.accounts, c.activity, c.today);
+  const asked = q.match(/(\d+)\s*years?/);
+  const years = asked ? Math.min(60, Math.max(1, Number(asked[1]))) : c.longTerm.years;
+  const a = { ...c.longTerm, years };
+  const monthly = a.monthlyCents ?? Math.max(0, contrib.monthlyCents);
+  const r = projectRange(s.valueCents, monthly, a);
+  const end = (p: typeof r.mid) => p.years[years].nominalCents;
+  const reach = a.targetCents ? monthsToTarget(s.valueCents, monthly, a.returnBps, a.targetCents) : null;
+  const usingDefaults = JSON.stringify(c.longTerm) === JSON.stringify(DEFAULT_LONG_TERM);
+  const rate = (bps: number) => `${(bps / 100).toFixed(bps % 100 ? 1 : 0)}%`;
+  return frame(c, q, {
+    headline: `If your investments grew ${rate(a.returnBps)} a year and you added ${formatMoney(monthly)} a month, they could be about ${formatMoney(end(r.mid))} in ${years} ${years === 1 ? "year" : "years"}. That's a projection, not a prediction.`,
+    facts: [
+      { label: "Starting value", value: formatMoney(s.valueCents) },
+      { label: `At ${rate(r.low.returnBps)} a year`, value: formatMoney(end(r.low)) },
+      { label: `At ${rate(r.mid.returnBps)} a year (assumed)`, value: formatMoney(end(r.mid)) },
+      { label: `At ${rate(r.high.returnBps)} a year`, value: formatMoney(end(r.high)) },
+      { label: "What you'd have put in", value: formatMoney(r.mid.years[years].contributedCents) },
+      ...(a.targetCents ? [{ label: `Time to reach ${formatMoney(a.targetCents)}`, value: reach === null ? "not within 60 years" : reach === 0 ? "already there" : `${Math.floor(reach / 12)} years ${reach % 12} months` }] : []),
+    ],
+    used: ["Your investment accounts' value today", a.monthlyCents !== null ? "The monthly amount you entered" : "Your pace of deposits over the last year", "The growth rate and length you set on the Long-term plan"],
+    notes: [
+      ...(usingDefaults ? ["You haven't set your own assumptions, so these are the defaults (5% a year, 20 years). They're a starting point, not a forecast."] : []),
+      "Markets don't grow steadily. Fees and taxes aren't included.",
+    ],
+    links: [{ label: "Open the long-term plan", view: "investments" }],
+    basis: "projection",
+  });
+}
+
 function forecastAnswer(c: AskContext, q: string): Answer {
   const asked = q.match(/(\d+) days?/);
   const days = asked ? Math.min(180, Math.max(1, Number(asked[1]))) : /end of (the )?month/.test(q) ? Math.max(1, Number(endOfMonth(c.today).slice(8)) - dayOfMonth(c.today)) : 30;
@@ -668,6 +773,10 @@ export function answer(question: string, c: AskContext): Answer {
   if (!q) return notUnderstood(c, question);
   const p = parsePeriod(q, c.today);
 
+  const investy = /(invest|portfolio|401|brokerage|retirement (account|fund)|nest egg)/.test(q);
+  if (/(retire|long.?term|nest egg)/.test(q) || (investy && /(\d+\s*years?|future|grow)/.test(q))) return longTermAnswer(c, question);
+  if (/(allocation|diversif|asset class|\bstocks?\b|\bbonds?\b|concentrat)/.test(q) || (investy && /(split|mix|risk|spread)/.test(q))) return allocationAnswer(c, question);
+  if (investy) return portfolioAnswer(c, question);
   if (/net worth|worth/.test(q)) return /(why|what|how).*(change|changed|move|moved|drop|dropped|go up|went up|go down|went down|differ)|change.*net worth/.test(q) ? netWorthWhy(c, question) : netWorth(c, question);
   if (/(debt.?free|pay(ing)? (it |them |my \w+ )?off|payoff|pay down)/.test(q) || (/when (will|do) i/.test(q) && /(debt|loan|card|mortgage)/.test(q))) return debtFreeAnswer(c, question);
   if (/(run (out|low|short)|go (negative|below zero|overdrawn)|overdraft|will i have enough|forecast|projected|project my|what will my (balance|cash|checking)|balance (in|by|after|at the end)|cash (in|by|at the end of))/.test(q)) return forecastAnswer(c, question);

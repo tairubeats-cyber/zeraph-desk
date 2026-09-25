@@ -9,7 +9,7 @@ export const NOTIFICATION_CATEGORIES: { key: NotificationCategory; label: string
   { key: "money", label: "Money", description: "Spending, income, budgets and recurring payments.", live: true },
   { key: "bills", label: "Bills", description: "Bills that are due soon or haven't shown up.", live: true },
   { key: "goals", label: "Goals", description: "Goals that are reached or running behind.", live: true },
-  { key: "investments", label: "Investments", description: "Changes in your investment accounts.", live: false },
+  { key: "investments", label: "Investments", description: "Big moves in your investments, and one company making up a lot of them.", live: true },
   { key: "security", label: "Security", description: "Sign-ins and changes to your connections.", live: false },
   { key: "system", label: "System", description: "Things about ZeraphDesk itself.", live: false },
 ];
@@ -27,7 +27,9 @@ export type DetectorId =
   | "spend-pace"
   | "goal-behind"
   | "goal-reached"
-  | "income-change";
+  | "income-change"
+  | "investments-drop"
+  | "concentration";
 
 export interface DetectorInfo {
   id: DetectorId;
@@ -37,9 +39,8 @@ export interface DetectorInfo {
 }
 
 /**
- * Everything ZeraphDesk can notice today. Changes in balances, investments and
- * debt aren't here because balances have no history yet; they arrive with the
- * planning and wealth phases, as new entries in this list.
+ * Everything ZeraphDesk can notice today. Changes in debt balances aren't here
+ * yet; they'd arrive as new entries in this list.
  */
 export const DETECTORS: DetectorInfo[] = [
   { id: "cash-pressure", label: "Checking balance dipping", description: "Known payments and income would take checking below your reserve.", category: "money" },
@@ -55,6 +56,8 @@ export const DETECTORS: DetectorInfo[] = [
   { id: "goal-behind", label: "Goal behind its deadline", description: "At the current rate a goal would finish after its deadline.", category: "goals" },
   { id: "goal-reached", label: "Goal reached", description: "A goal has hit its target.", category: "goals" },
   { id: "income-change", label: "Income changed", description: "A full month's income differs noticeably from the months before.", category: "money" },
+  { id: "investments-drop", label: "Investments fell", description: "Your investment accounts lost 10% or more over 30 days, after counting money you put in.", category: "investments" },
+  { id: "concentration", label: "One company is a big share", description: "A single stock makes up 15% or more of your investments.", category: "investments" },
 ];
 
 export interface FinancePreferences {

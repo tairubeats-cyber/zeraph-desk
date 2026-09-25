@@ -17,6 +17,7 @@ import { Forecast } from "./views/Forecast";
 import { Scenarios } from "./views/Scenarios";
 import { NetWorth } from "./views/NetWorth";
 import { Debt } from "./views/Debt";
+import { Investments } from "./views/Investments";
 import { ActionCenter } from "./views/ActionCenter";
 import { Activity } from "./views/Activity";
 import { Ask, type Asked } from "./views/Ask";
@@ -123,6 +124,8 @@ export default function App() {
         return <NetWorth finance={finance} planning={planning} />;
       case "debt":
         return <Debt finance={finance} planning={planning} />;
+      case "investments":
+        return <Investments finance={finance} plans={plans} planning={planning} />;
       case "action-center":
         return <ActionCenter finance={finance} plans={plans} intel={intel} onOpen={open} onNotify={flash} />;
       case "activity":

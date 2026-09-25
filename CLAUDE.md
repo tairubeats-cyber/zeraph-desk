@@ -198,13 +198,29 @@ wording and structure.
   - *Scenarios report differences from carrying on*, never a predicted absolute, so they
     need no forecast of the baseline. Net worth in a scenario is cash + set aside + value
     of what was bought + reduction in debt, so the parts always sum to the total.
+- **Wealth (phase 5).** Holdings (`Position`) and deposits (`InvestmentActivity`) come
+  through the provider seam like everything else; the sample invents them, each account's
+  holdings add up to its balance exactly, and the screen says so. Nothing is stored for
+  investments except the long-term assumptions the person enters (`fin_long_term` in `settings`).
+  - *No trading, no advice.* The workspace describes what's held and how it moved. Wording
+    about allocation or concentration says what the split is and never whether it's right.
+  - *Returns are Modified Dietz* (`investments.ts`): growth over the start value plus each
+    deposit weighted by time invested. It's labelled an estimate and it never annualizes a
+    stretch shorter than a year. Dividends are growth, never "money put in".
+  - *Performance uses the same gap rule as net worth* (`balanceLookup` in `networth.ts`).
+    Accounts with no holdings listed stay one "not broken down" slice; nothing is guessed.
+  - *Long-term projection* (`longterm.ts`) uses only assumptions the person enters, shown as a
+    range (assumed rate and 2 points either side), never one line, and says it is not a prediction.
+  - *Investment findings:* `investments-drop` (down 10% or more over 30 days after counting
+    deposits) and `concentration` (a single stock 15% or more; funds don't count). Both are
+    off-limits for advice wording.
 - **Seeding is idempotent.** Default rows go in with INSERT OR IGNORE behind a
   single shared promise, never "insert if the table is empty"; concurrent loads
   once left categories missing.
-- **Order of work:** phases 1 to 4 done (shell, Overview, Accounts, Transactions; Recurring,
+- **Order of work:** phases 1 to 5 done (shell, Overview, Accounts, Transactions; Recurring,
   Bills, Cash Flow, Budgets, Goals; Action Center, Activity, Ask, notifications,
-  Preferences; Forecast, Scenarios, Debt, Net Worth). Next: wealth (Investments, portfolio
-  analysis, long-term planning), then real provider infrastructure. Don't fake a later phase inside an earlier one.
+  Preferences; Forecast, Scenarios, Debt, Net Worth; Investments with portfolio analysis
+  and the long-term plan). Next: real provider infrastructure (phase 6). Don't fake a later phase inside an earlier one.
 
 ## Trades
 

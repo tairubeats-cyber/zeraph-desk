@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { db, newEvent } from "../db";
-import type { DebtTerms, Holding, HoldingKind, PlannedItem, Scenario } from "./types";
+import { DEFAULT_LONG_TERM } from "./longterm";
+import type { DebtTerms, Holding, HoldingKind, LongTermAssumptions, PlannedItem, Scenario } from "./types";
 
 interface Stored {
   terms: Map<string, DebtTerms>;
   holdings: Holding[];
   planned: PlannedItem[];
   scenarios: Scenario[];
+  longTerm: LongTermAssumptions;
 }
 
 function message(err: unknown): string {
@@ -30,13 +32,14 @@ export function usePlanning(onError: (message: string) => void) {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [terms, holdings, planned, scenarios] = await Promise.all([
+      const [terms, holdings, planned, scenarios, longTerm] = await Promise.all([
         db.debtTerms(),
         db.holdings(),
         db.plannedItems(),
         db.scenarios(),
+        db.finLongTerm(),
       ]);
-      setStored({ terms: new Map(terms.map((t) => [t.accountId, t])), holdings, planned, scenarios });
+      setStored({ terms: new Map(terms.map((t) => [t.accountId, t])), holdings, planned, scenarios, longTerm });
     } catch (err) {
       setError(message(err));
     }
@@ -183,6 +186,16 @@ export function usePlanning(onError: (message: string) => void) {
     [guarded, patch],
   );
 
+  const saveLongTerm = useCallback(
+    (next: LongTermAssumptions) =>
+      guarded(async () => {
+        patch((s) => ({ ...s, longTerm: next }));
+        await db.saveFinLongTerm(next);
+        await db.log(newEvent("long_term_changed", null));
+      }),
+    [guarded, patch],
+  );
+
   const empty = useMemo(() => ({ terms: new Map<string, DebtTerms>(), holdings: [], planned: [], scenarios: [] }), []);
 
   return {
@@ -193,6 +206,8 @@ export function usePlanning(onError: (message: string) => void) {
     holdings: stored?.holdings ?? (empty.holdings as Holding[]),
     planned: stored?.planned ?? (empty.planned as PlannedItem[]),
     scenarios: stored?.scenarios ?? (empty.scenarios as Scenario[]),
+    longTerm: stored?.longTerm ?? DEFAULT_LONG_TERM,
+    saveLongTerm,
     saveDebtTerms,
     addHolding,
     renameHolding,

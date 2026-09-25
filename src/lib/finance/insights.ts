@@ -12,19 +12,23 @@
  * ("budget-over:dining:2026-09"), so dismissing one stays dismissed for that
  * month without hiding next month's.
  *
- * Not here yet, on purpose: changes in balances, investments and debt. Balances
- * have no history until the planning and wealth phases add it.
+ * Not here yet, on purpose: changes in debt balances.
  */
 import type { ViewKey } from "../../nav";
 import type {
+  BalancePoint,
   Basis,
   Category,
   FinancialAccount,
   Goal,
   GoalContribution,
+  InvestmentActivity,
+  Position,
   RecurringPayment,
   ResolvedTransaction,
 } from "./types";
+import { holdingRows, performance } from "./investments";
+import { RANGES } from "./networth";
 import type { TxFilters } from "./filters";
 import { DETECTORS, type DetectorId, type FinancePreferences, type NotificationCategory } from "./prefs";
 import { averageMonthlySpend, budgetRows } from "./budget";
@@ -75,6 +79,8 @@ export interface DetectContext {
   budgets: Map<string, number>;
   goals: Goal[];
   contributions: GoalContribution[];
+  /** Holdings, balance history and deposits, when the provider has them. Without them the investment detectors stay quiet. */
+  investments?: { positions: Position[]; history: BalancePoint[]; activity: InvestmentActivity[] };
   prefs: FinancePreferences;
 }
 
@@ -505,7 +511,62 @@ const incomeChange: Detector = (c) => {
   ];
 };
 
+const pct = (x: number) => `${Math.abs(Math.round(x * 1000) / 10)}%`;
+
+const investmentsDrop: Detector = (c) => {
+  if (!c.investments) return [];
+  const p = performance(c.accounts, c.investments.history, c.investments.activity, c.today, RANGES[1]);
+  if (!p || p.returnPct === null || p.returnPct > -0.1) return [];
+  return [
+    {
+      id: `investments-drop:${monthKey(c.today)}`,
+      detector: "investments-drop" as const,
+      severity: p.returnPct <= -0.2 ? ("attention" as const) : ("notice" as const),
+      category: "investments" as const,
+      title: `Your investments are down ${pct(p.returnPct)} over 30 days`,
+      summary: `Worth ${formatMoney(p.startCents)} on ${day(p.from)} and ${formatMoney(p.endCents)} now, counting ${formatMoney(p.netContributionsCents)} you put in.`,
+      facts: [
+        { label: `Value on ${day(p.from)}`, value: formatMoney(p.startCents) },
+        { label: "Put in since", value: formatMoney(p.netContributionsCents) },
+        { label: "Value now", value: formatMoney(p.endCents) },
+        { label: "Market change", value: formatMoney(p.growthCents, { signed: true }) },
+      ],
+      why: "Investments move up and down, and a fall over a month says nothing certain about what comes next. This only notes the size of the move.",
+      options: [{ kind: "open" as const, label: "Open investments", view: "investments" as const }],
+      basis: "calculation" as const,
+      on: c.today,
+    },
+  ];
+};
+
+const CONCENTRATION_SHARE = 0.15;
+
+const concentrationDetector: Detector = (c) => {
+  if (!c.investments) return [];
+  return holdingRows(c.accounts, c.investments.positions)
+    .filter((r) => r.position.type === "stock" && r.share >= CONCENTRATION_SHARE)
+    .map((r) => ({
+      id: `concentration:${r.position.symbol}:${monthKey(c.today)}`,
+      detector: "concentration" as const,
+      severity: "notice" as const,
+      category: "investments" as const,
+      title: `${r.position.name} is ${pct(r.share)} of your investments`,
+      summary: `${formatMoney(r.valueCents)} of your ${formatMoney(r.valueCents / r.share)} in investments is in this one company.`,
+      facts: [
+        { label: "Holding", value: `${r.position.name} (${r.position.symbol})` },
+        { label: "Value", value: formatMoney(r.valueCents) },
+        { label: "Share of investments", value: pct(r.share) },
+      ],
+      why: "One company can move a lot more than a fund of many. This notes how much of your investments it is; it isn't saying that's too much.",
+      options: [{ kind: "open" as const, label: "See allocation", view: "investments" as const }],
+      basis: "calculation" as const,
+      on: c.today,
+    }));
+};
+
 const DETECTOR_FNS: Record<DetectorId, Detector> = {
+  "investments-drop": investmentsDrop,
+  concentration: concentrationDetector,
   "cash-pressure": cashPressure,
   "bill-due-soon": billDueSoon,
   "bill-not-seen": billNotSeen,

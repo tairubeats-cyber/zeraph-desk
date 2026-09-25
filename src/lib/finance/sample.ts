@@ -1,4 +1,15 @@
-import type { BalancePoint, Connection, FinancialAccount, FinancialSnapshot, Institution, Transaction } from "./types";
+import type {
+  AssetClass,
+  BalancePoint,
+  Connection,
+  FinancialAccount,
+  FinancialSnapshot,
+  Institution,
+  InvestmentActivity,
+  Position,
+  PositionType,
+  Transaction,
+} from "./types";
 import { addDays, recentMonthKeys, toISODate } from "./money";
 
 /**
@@ -113,8 +124,8 @@ function generateBalanceHistory(today: string, accounts: FinancialAccount[]): Ba
   const story: Record<string, (k: number, r: number) => number> = {
     "acct-checking": (_k, r) => 3_000 + r * 2_600,
     "acct-savings": (k, r) => 12_600 - 320 * k + (r - 0.5) * 120,
-    "acct-brokerage": (k, r) => (28_450 - 480 * k) * (1 + (r - 0.5) * 0.08),
-    "acct-401k": (k, r) => (64_300 - 1_300 * k) * (1 + (r - 0.5) * 0.06),
+    "acct-brokerage": (k, r) => (28_450 - 640 * k) * (1 + (r - 0.5) * 0.08),
+    "acct-401k": (k, r) => (64_300 - 1_000 * k) * (1 + (r - 0.5) * 0.06),
     "acct-card": (_k, r) => 600 + r * 1_400,
     "acct-auto": (k, r) => 12_400 + 290 * k + (r - 0.5) * 10,
     "acct-student": (k, r) => 18_900 + 200 * k + (r - 0.5) * 10,
@@ -141,6 +152,109 @@ function generateBalanceHistory(today: string, accounts: FinancialAccount[]): Ba
     }
   }
   return points;
+}
+
+interface PositionPlan {
+  symbol: string;
+  name: string;
+  type: PositionType;
+  assetClass: AssetClass;
+  /** Share of the account, in percent. Cash takes whatever is left, so the total is exact. */
+  weight: number;
+  /** Price per unit in cents. */
+  price: number;
+  /** Typical cost basis as a share of today's value, or null when the account doesn't report one. */
+  basis: number | null;
+}
+
+const POSITION_PLANS: Record<string, PositionPlan[]> = {
+  "acct-brokerage": [
+    { symbol: "NTMX", name: "Northfield U.S. Total Market Index", type: "fund", assetClass: "us_stock", weight: 42, price: 14_872, basis: 0.81 },
+    { symbol: "MRIX", name: "Meridian International Index", type: "fund", assetClass: "intl_stock", weight: 18, price: 6_390, basis: 0.94 },
+    { symbol: "HLSY", name: "Harborline Systems", type: "stock", assetClass: "us_stock", weight: 14, price: 21_845, basis: 0.72 },
+    { symbol: "CPLF", name: "Copperleaf Energy", type: "stock", assetClass: "us_stock", weight: 8, price: 5_236, basis: 1.02 },
+    { symbol: "RABX", name: "Ridgeline Aggregate Bond", type: "fund", assetClass: "bond", weight: 12, price: 4_811, basis: 0.97 },
+  ],
+  "acct-401k": [
+    { symbol: "SM500", name: "Summit 500 Index", type: "fund", assetClass: "us_stock", weight: 50, price: 31_260, basis: null },
+    { symbol: "SMINT", name: "Summit International Index", type: "fund", assetClass: "intl_stock", weight: 20, price: 2_715, basis: null },
+    { symbol: "SMBND", name: "Summit Bond Index", type: "fund", assetClass: "bond", weight: 25, price: 1_042, basis: null },
+  ],
+};
+
+/** A stable number from text, so a symbol always draws the same wobble on the same day. */
+function hashOf(text: string): number {
+  return [...text].reduce((h, ch) => Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0, 2166136261);
+}
+
+/**
+ * Invented holdings for the investment accounts. Each account's holdings add up
+ * to exactly its balance: the last position is cash, taking the remainder.
+ * Yesterday's price is drawn from the date, so "today's change" moves day to
+ * day but never differs between two looks on the same day.
+ */
+function generatePositions(today: string, accounts: FinancialAccount[]): Position[] {
+  const dayNumber = Number(today.replace(/-/g, ""));
+  const out: Position[] = [];
+  for (const a of accounts) {
+    const plans = POSITION_PLANS[a.id];
+    if (!plans) continue;
+    let used = 0;
+    for (const p of plans) {
+      const target = Math.round((a.balanceCents * p.weight) / 100);
+      const quantity = Math.round((target / p.price) * 1000) / 1000;
+      const value = Math.round(quantity * p.price);
+      used += value;
+      const swing = p.type === "stock" ? 0.024 : 0.012;
+      const wobble = (rng(dayNumber + hashOf(p.symbol))() - 0.5) * swing;
+      out.push({
+        id: `pos-${a.id}-${p.symbol}`,
+        accountId: a.id,
+        symbol: p.symbol,
+        name: p.name,
+        type: p.type,
+        assetClass: p.assetClass,
+        quantity,
+        priceCents: p.price,
+        previousCloseCents: Math.round(p.price / (1 + wobble)),
+        costBasisCents: p.basis === null ? null : Math.round(value * p.basis),
+      });
+    }
+    const cash = a.balanceCents - used;
+    out.push({
+      id: `pos-${a.id}-CASH`,
+      accountId: a.id,
+      symbol: "CASH",
+      name: "Cash",
+      type: "cash",
+      assetClass: "cash",
+      quantity: cash / 100,
+      priceCents: 100,
+      previousCloseCents: 100,
+      costBasisCents: plans.some((p) => p.basis !== null) ? cash : null,
+    });
+  }
+  return out;
+}
+
+/** Monthly contributions and quarterly dividends over the same three years as the balance history. */
+function generateActivity(today: string): InvestmentActivity[] {
+  const out: InvestmentActivity[] = [];
+  const earliest = addDays(today, -HISTORY_DAYS);
+  for (const month of recentMonthKeys(today, 38)) {
+    const [y, m] = month.split("-").map(Number);
+    const rand = rng(y * 100 + m + 7);
+    const on = (day: number) => toISODate(new Date(y, m - 1, day));
+    const add = (accountId: string, key: string, day: number, kind: InvestmentActivity["kind"], amountCents: number) => {
+      const date = on(day);
+      if (date > today || date < earliest) return;
+      out.push({ id: `act-${month}-${key}`, accountId, date, kind, amountCents });
+    };
+    add("acct-brokerage", "b-contrib", 2, "contribution", 50_000);
+    add("acct-401k", "k-contrib", 15, "contribution", 65_000);
+    if (m % 3 === 0) add("acct-brokerage", "b-div", 20, "dividend", 4_500 + Math.round(rand() * 2_700));
+  }
+  return out.sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
 }
 
 export function generateSample(today: string): FinancialSnapshot {
@@ -198,5 +312,8 @@ export function generateSample(today: string): FinancialSnapshot {
   }
 
   transactions.sort((a, b) => (a.date === b.date ? a.id.localeCompare(b.id) : b.date.localeCompare(a.date)));
-  return { institutions: INSTITUTIONS, connections, accounts, transactions, balanceHistory: generateBalanceHistory(today, accounts) };
+  return { institutions: INSTITUTIONS, connections, accounts, transactions, balanceHistory: generateBalanceHistory(today, accounts),
+    positions: generatePositions(today, accounts),
+    investmentActivity: generateActivity(today),
+  };
 }

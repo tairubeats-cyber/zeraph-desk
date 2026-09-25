@@ -137,7 +137,7 @@ export const GROUPS: NavGroup[] = [
     icon: Scale,
     items: [
       { key: "net-worth", label: "Net Worth", icon: Scale, built: true, phase: 4, about: "Assets minus liabilities over time, from today out to all time." },
-      { key: "investments", label: "Investments", icon: TrendingUp, built: false, phase: 5, about: "Portfolio value, holdings, allocation and performance." },
+      { key: "investments", label: "Investments", icon: TrendingUp, built: true, phase: 5, about: "Portfolio value, holdings, allocation and performance." },
       { key: "debt", label: "Debt", icon: CreditCard, built: true, phase: 4, about: "Balances, rates and payments, with estimates of how extra payments change the payoff date." },
     ],
   },

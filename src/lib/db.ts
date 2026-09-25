@@ -11,6 +11,7 @@ import type { Contact, Thread, Channel, Message } from "./types";
 import { type BusinessFacts, EMPTY_FACTS } from "./facts";
 import { type Event, type EventKind, newEvent } from "./events";
 import { type FinancePreferences, mergePrefs } from "./finance/prefs";
+import { mergeLongTerm } from "./finance/longterm";
 import type { InsightState } from "./finance/intel";
 import type {
   Autopay,
@@ -24,6 +25,7 @@ import type {
   GoalKind,
   Holding,
   HoldingKind,
+  LongTermAssumptions,
   ManualRecurring,
   Necessity,
   PlannedItem,
@@ -41,6 +43,7 @@ const FACTS_KEY = "business_facts";
 const SYNC_CURSOR_KEY = "mail_sync_cursor";
 const SEAT_TOKEN_KEY = "seat_token";
 const FIN_PREFS_KEY = "fin_preferences";
+const FIN_LONG_TERM_KEY = "fin_long_term";
 
 interface ContactRow {
   id: string;
@@ -865,6 +868,28 @@ export const db = {
       `INSERT INTO settings (key, value) VALUES ($1, $2)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
       [FIN_PREFS_KEY, JSON.stringify(prefs)],
+    );
+  },
+
+  // --- Finance phase 5: the assumptions behind the long-term projection. Entered by the person. ---
+
+  async finLongTerm(): Promise<LongTermAssumptions> {
+    const handle = await open();
+    const rows = await handle.select<{ value: string }[]>("SELECT value FROM settings WHERE key = $1", [FIN_LONG_TERM_KEY]);
+    if (!rows.length) return mergeLongTerm(null);
+    try {
+      return mergeLongTerm(JSON.parse(rows[0].value));
+    } catch {
+      return mergeLongTerm(null);
+    }
+  },
+
+  async saveFinLongTerm(a: LongTermAssumptions): Promise<void> {
+    const handle = await open();
+    await handle.execute(
+      `INSERT INTO settings (key, value) VALUES ($1, $2)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      [FIN_LONG_TERM_KEY, JSON.stringify(a)],
     );
   },
 

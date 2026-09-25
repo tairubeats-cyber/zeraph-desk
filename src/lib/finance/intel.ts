@@ -162,7 +162,7 @@ const VIEW_FOR: Record<NotificationCategory, ViewKey> = {
   money: "action-center",
   bills: "bills",
   goals: "goals",
-  investments: "action-center",
+  investments: "investments",
   security: "action-center",
   system: "action-center",
 };

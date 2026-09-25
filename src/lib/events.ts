@@ -26,7 +26,8 @@ export type EventKind =
   | "debt_terms_saved"
   | "holding_changed"
   | "planned_item_added"
-  | "scenario_saved";
+  | "scenario_saved"
+  | "long_term_changed";
 
 export interface Event {
   id: ID;
