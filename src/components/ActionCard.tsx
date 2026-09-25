@@ -3,6 +3,7 @@ import { type Action, ACTION_LABELS, APPROVE_VERB } from "../lib/actions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/field";
+import { isExampleAction } from "../lib/fixtures";
 
 interface Props {
   action: Action;
@@ -63,6 +64,9 @@ export function ActionCard({ action, onApprove, onDecline }: Props) {
           <span className="inline-flex h-6 items-center rounded-full bg-surface-secondary px-2.5 text-meta font-medium text-ink-secondary">
             {ACTION_LABELS[action.kind]}
           </span>
+          {isExampleAction(action.id) && (
+            <span className="inline-flex h-6 items-center rounded-full bg-warning-soft px-2.5 text-meta font-medium text-ink">Example</span>
+          )}
           {to && <span className="min-w-0 truncate text-body text-ink-secondary">to {to}</span>}
           <time dateTime={action.createdAt} className="ml-auto text-meta text-ink-tertiary">
             {new Date(action.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}

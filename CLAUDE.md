@@ -109,6 +109,8 @@ five customers are running.
 adding anything that isn't on it, check whether it's on the cut list first —
 most good ideas right now are v2 ideas.
 
+**Example emails.** The three invented example emails a first run shows (`fixtures.ts`) are labelled "Example" and are deleted the moment a real email account is connected (`db.removeExamples`, called from `checkMail`), so an invented draft can never sit beside or be sent as a real one. Keep their ids in `EXAMPLE_*_IDS`.
+
 ## Finance area (ZeraphDesk expansion)
 
 ZeraphDesk is growing a personal financial command center beside the email desk.

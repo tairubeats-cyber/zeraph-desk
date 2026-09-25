@@ -9,6 +9,13 @@ import type { Contact, Thread } from "./types";
 const now = new Date();
 const minutesAgo = (m: number) => new Date(now.getTime() - m * 60_000).toISOString();
 
+/** The ids of the invented example rows below. Real rows never use them. */
+export const EXAMPLE_CONTACT_IDS = ["c1", "c2", "c3"];
+export const EXAMPLE_THREAD_IDS = ["t1", "t2", "t3"];
+export const EXAMPLE_ACTION_IDS = ["a1", "a2", "a3"];
+
+export const isExampleAction = (id: string) => EXAMPLE_ACTION_IDS.includes(id);
+
 export const FIXTURE_CONTACTS: Contact[] = [
   { id: "c1", name: "Dana Whitfield", email: "dana.w@example.com", phone: null, firstSeen: minutesAgo(45), lastSeen: minutesAgo(12), tags: [] },
   { id: "c2", name: "Marcus Hale", email: "m.hale@example.com", phone: null, firstSeen: minutesAgo(2880), lastSeen: minutesAgo(90), tags: ["past customer"] },

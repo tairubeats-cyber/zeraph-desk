@@ -55,7 +55,7 @@ export function SampleNotice({ onOpenAccounts }: { onOpenAccounts?: () => void }
       <Info className="mt-0.5 h-4 w-4 shrink-0 text-ink-tertiary" strokeWidth={1.75} aria-hidden="true" />
       <p className="min-w-0 flex-1">
         <span className="font-medium text-ink">Sample data.</span> No accounts are connected, so every balance and
-        transaction here is invented for you to try things out. To use your own, import a file under Connections.
+        transaction here is invented for you to try things out. To use your own, link your accounts with SimpleFIN or import a file, under Connections.
         {onOpenAccounts && (
           <>
             {" "}

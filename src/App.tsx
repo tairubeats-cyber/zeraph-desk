@@ -183,6 +183,17 @@ export default function App() {
       connected = false;
     }
     setMailConnected(connected);
+    // The invented example emails are only for looking around with; real email replaces them.
+    if (connected) {
+      try {
+        if ((await db.removeExamples()) > 0) {
+          setPending(await db.pendingActions());
+          setPast(await db.recentActions());
+        }
+      } catch (err) {
+        console.error("Couldn't remove the example emails:", err instanceof Error ? err.message : err);
+      }
+    }
     return connected;
   }
 

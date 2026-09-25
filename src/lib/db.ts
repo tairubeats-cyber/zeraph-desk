@@ -42,7 +42,14 @@ import type {
   TransactionOverride,
 } from "./finance/types";
 import { DEFAULT_CATEGORIES } from "./finance/categories";
-import { FIXTURE_ACTIONS, FIXTURE_CONTACTS, FIXTURE_THREADS } from "./fixtures";
+import {
+  EXAMPLE_ACTION_IDS,
+  EXAMPLE_CONTACT_IDS,
+  EXAMPLE_THREAD_IDS,
+  FIXTURE_ACTIONS,
+  FIXTURE_CONTACTS,
+  FIXTURE_THREADS,
+} from "./fixtures";
 
 const DB_PATH = "sqlite:zeraph.db";
 const FACTS_KEY = "business_facts";
@@ -260,6 +267,25 @@ async function seedIfEmpty(handle: Database): Promise<void> {
 }
 
 export const db = {
+  /**
+   * Remove the invented example emails the first run shows. Called once a real email account is connected,
+   * so an example reply can never sit beside (or be sent as) a real one. Returns how many rows went.
+   */
+  async removeExamples(): Promise<number> {
+    const handle = await open();
+    const marks = (ids: string[]) => ids.map((_, i) => "$" + (i + 1)).join(", ");
+    let removed = 0;
+    for (const [table, column, ids] of [
+      ["actions", "id", EXAMPLE_ACTION_IDS],
+      ["threads", "id", EXAMPLE_THREAD_IDS],
+      ["contacts", "id", EXAMPLE_CONTACT_IDS],
+    ] as const) {
+      const result = await handle.execute("DELETE FROM " + table + " WHERE " + column + " IN (" + marks([...ids]) + ")", [...ids]);
+      removed += result.rowsAffected;
+    }
+    return removed;
+  },
+
   async pendingActions(): Promise<Action[]> {
     const handle = await open();
     const rows = await handle.select<ActionRow[]>(
