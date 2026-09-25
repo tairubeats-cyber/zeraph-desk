@@ -32,6 +32,8 @@ export interface InsightState {
   read: boolean;
   /** Hidden from the notification list only; it stays in the Action Center. */
   notifHidden: boolean;
+  /** Already shown as a system notification, so it isn't shown twice. */
+  osNotified: boolean;
   updatedAt: string;
 }
 
@@ -82,6 +84,7 @@ export function planSync(
         status: "open",
         read: false,
         notifHidden: false,
+        osNotified: false,
         updatedAt: now,
       };
       byId.set(i.id, s);
@@ -96,6 +99,7 @@ export function planSync(
         status: "open",
         read: false,
         notifHidden: false,
+        osNotified: false,
         updatedAt: now,
       };
       byId.set(i.id, s);

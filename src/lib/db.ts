@@ -14,7 +14,9 @@ import { type FinancePreferences, mergePrefs } from "./finance/prefs";
 import { mergeLongTerm } from "./finance/longterm";
 import type { InsightState } from "./finance/intel";
 import type {
+  AccountKind,
   Autopay,
+  BalancePoint,
   Budget,
   Category,
   CategoryKind,
@@ -25,6 +27,8 @@ import type {
   GoalKind,
   Holding,
   HoldingKind,
+  ImportRecord,
+  ImportedAccount,
   LongTermAssumptions,
   ManualRecurring,
   Necessity,
@@ -33,6 +37,7 @@ import type {
   RecurringStatus,
   Scenario,
   ScenarioChange,
+  Transaction,
   TransactionOverride,
 } from "./finance/types";
 import { DEFAULT_CATEGORIES } from "./finance/categories";
@@ -871,6 +876,138 @@ export const db = {
     );
   },
 
+  // --- Finance phase 6: accounts, transactions and balances the person imported. Read only by the imported provider. ---
+
+  async srcAccountCount(): Promise<number> {
+    const handle = await open();
+    const rows = await handle.select<{ n: number }[]>("SELECT COUNT(*) AS n FROM fin_src_accounts");
+    return rows[0]?.n ?? 0;
+  },
+
+  async srcAccounts(): Promise<ImportedAccount[]> {
+    const handle = await open();
+    const rows = await handle.select<
+      { id: string; name: string; kind: string; institution: string; mask: string | null; balance_cents: number; created_at: string }[]
+    >("SELECT * FROM fin_src_accounts ORDER BY created_at ASC");
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      kind: r.kind as AccountKind,
+      institution: r.institution,
+      mask: r.mask,
+      balanceCents: r.balance_cents,
+      createdAt: r.created_at,
+    }));
+  },
+
+  async saveSrcAccount(a: ImportedAccount): Promise<void> {
+    const handle = await open();
+    await handle.execute(
+      `INSERT INTO fin_src_accounts (id, name, kind, institution, mask, balance_cents, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT(id) DO UPDATE SET name = excluded.name, kind = excluded.kind, institution = excluded.institution,
+         mask = excluded.mask, balance_cents = excluded.balance_cents`,
+      [a.id, a.name, a.kind, a.institution, a.mask, a.balanceCents, a.createdAt],
+    );
+  },
+
+  /** Removes the account and everything imported into it. Notes and category choices on its transactions stay, harmlessly. */
+  async deleteSrcAccount(id: string): Promise<void> {
+    const handle = await open();
+    for (const table of ["fin_src_transactions", "fin_src_balances", "fin_src_imports"]) {
+      await handle.execute(`DELETE FROM ${table} WHERE account_id = $1`, [id]);
+    }
+    await handle.execute("DELETE FROM fin_src_accounts WHERE id = $1", [id]);
+  },
+
+  async srcBalances(): Promise<BalancePoint[]> {
+    const handle = await open();
+    const rows = await handle.select<{ account_id: string; date: string; balance_cents: number }[]>(
+      "SELECT * FROM fin_src_balances ORDER BY date ASC",
+    );
+    return rows.map((r) => ({ accountId: r.account_id, date: r.date, balanceCents: r.balance_cents }));
+  },
+
+  /**
+   * Record balances for an account, one per day (a day's value replaces an earlier one). The account's own
+   * balance is then the one on its latest date, so entering an old balance never overrides a newer one.
+   */
+  async setSrcBalances(accountId: string, balances: Map<string, number>): Promise<void> {
+    if (balances.size === 0) return;
+    const handle = await open();
+    for (const [date, cents] of balances) {
+      await handle.execute(
+        `INSERT INTO fin_src_balances (account_id, date, balance_cents) VALUES ($1, $2, $3)
+         ON CONFLICT(account_id, date) DO UPDATE SET balance_cents = excluded.balance_cents`,
+        [accountId, date, cents],
+      );
+    }
+    await handle.execute(
+      `UPDATE fin_src_accounts SET balance_cents =
+         (SELECT balance_cents FROM fin_src_balances WHERE account_id = $1 ORDER BY date DESC LIMIT 1)
+       WHERE id = $1`,
+      [accountId],
+    );
+  },
+
+  async srcTransactions(): Promise<Transaction[]> {
+    const handle = await open();
+    const rows = await handle.select<
+      { id: string; account_id: string; date: string; merchant: string; description: string; amount_cents: number; category_hint: string | null }[]
+    >("SELECT * FROM fin_src_transactions ORDER BY date DESC, id ASC");
+    return rows.map((r) => ({
+      id: r.id,
+      accountId: r.account_id,
+      date: r.date,
+      merchant: r.merchant,
+      description: r.description,
+      amountCents: r.amount_cents,
+      categoryHint: r.category_hint,
+      pending: false,
+    }));
+  },
+
+  /** Adds the rows that aren't already there and returns how many were new. Safe to repeat. */
+  async insertSrcTransactions(accountId: string, rows: Transaction[], batchId: string): Promise<number> {
+    const handle = await open();
+    let added = 0;
+    const CHUNK = 100;
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const part = rows.slice(i, i + CHUNK);
+      const marks = part.map((_, k) => `($${k * 8 + 1}, $${k * 8 + 2}, $${k * 8 + 3}, $${k * 8 + 4}, $${k * 8 + 5}, $${k * 8 + 6}, $${k * 8 + 7}, $${k * 8 + 8})`).join(", ");
+      const values = part.flatMap((t) => [t.id, accountId, t.date, t.merchant, t.description, t.amountCents, t.categoryHint, batchId]);
+      const result = await handle.execute(
+        `INSERT OR IGNORE INTO fin_src_transactions (id, account_id, date, merchant, description, amount_cents, category_hint, batch_id) VALUES ${marks}`,
+        values,
+      );
+      added += result.rowsAffected;
+    }
+    return added;
+  },
+
+  async logSrcImport(r: ImportRecord): Promise<void> {
+    const handle = await open();
+    await handle.execute(
+      "INSERT INTO fin_src_imports (id, account_id, at, file_name, rows_total, added, skipped, invalid) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+      [r.id, r.accountId, r.at, r.fileName, r.rowsTotal, r.added, r.skipped, r.invalid],
+    );
+  },
+
+  async srcImports(): Promise<ImportRecord[]> {
+    const handle = await open();
+    const rows = await handle.select<
+      { id: string; account_id: string; at: string; file_name: string; rows_total: number; added: number; skipped: number; invalid: number }[]
+    >("SELECT * FROM fin_src_imports ORDER BY at DESC");
+    return rows.map((r) => ({ id: r.id, accountId: r.account_id, at: r.at, fileName: r.file_name, rowsTotal: r.rows_total, added: r.added, skipped: r.skipped, invalid: r.invalid }));
+  },
+
+  /** Empties everything that was imported. The app goes back to showing the sample. */
+  async clearSrc(): Promise<void> {
+    const handle = await open();
+    for (const table of ["fin_src_transactions", "fin_src_balances", "fin_src_imports", "fin_src_accounts"]) {
+      await handle.execute(`DELETE FROM ${table}`);
+    }
+  },
+
   // --- Finance phase 5: the assumptions behind the long-term projection. Entered by the person. ---
 
   async finLongTerm(): Promise<LongTermAssumptions> {
@@ -907,6 +1044,7 @@ export const db = {
         status: string;
         read: number;
         notif_hidden: number;
+        os_notified: number;
         updated_at: string;
       }[]
     >("SELECT * FROM fin_insights ORDER BY first_seen_at DESC");
@@ -921,6 +1059,7 @@ export const db = {
       status: r.status as InsightState["status"],
       read: r.read === 1,
       notifHidden: r.notif_hidden === 1,
+      osNotified: r.os_notified === 1,
       updatedAt: r.updated_at,
     }));
   },
@@ -928,12 +1067,12 @@ export const db = {
   async saveInsightState(s: InsightState): Promise<void> {
     const handle = await open();
     await handle.execute(
-      `INSERT INTO fin_insights (id, detector, severity, category, title, summary, first_seen_at, status, read, notif_hidden, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `INSERT INTO fin_insights (id, detector, severity, category, title, summary, first_seen_at, status, read, notif_hidden, os_notified, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        ON CONFLICT(id) DO UPDATE SET status = excluded.status, read = excluded.read,
-         notif_hidden = excluded.notif_hidden, updated_at = excluded.updated_at,
+         notif_hidden = excluded.notif_hidden, os_notified = excluded.os_notified, updated_at = excluded.updated_at,
          title = excluded.title, summary = excluded.summary, first_seen_at = excluded.first_seen_at`,
-      [s.id, s.detector, s.severity, s.category, s.title, s.summary, s.firstSeenAt, s.status, s.read ? 1 : 0, s.notifHidden ? 1 : 0, s.updatedAt],
+      [s.id, s.detector, s.severity, s.category, s.title, s.summary, s.firstSeenAt, s.status, s.read ? 1 : 0, s.notifHidden ? 1 : 0, s.osNotified ? 1 : 0, s.updatedAt],
     );
   },
 

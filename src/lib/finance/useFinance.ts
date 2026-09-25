@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { db, newEvent } from "../db";
-import { activeProvider } from "./providers";
+import { pickProvider } from "./providers";
 import { categoryMap, resolveTransactions } from "./analysis";
 import { toISODate } from "./money";
 import type {
   Category,
   CategoryKind,
+  DataOrigin,
   FinancialSnapshot,
   ResolvedTransaction,
   TransactionOverride,
@@ -16,6 +17,9 @@ interface Loaded {
   categories: Category[];
   overrides: Map<string, TransactionOverride>;
   today: string;
+  /** Which provider the snapshot came from. */
+  source: "sample" | "import";
+  origin: DataOrigin;
 }
 
 function message(err: unknown): string {
@@ -36,14 +40,22 @@ export function useFinance(onError: (message: string) => void) {
   const load = useCallback(async () => {
     setError(null);
     try {
+      const provider = await pickProvider();
       const [snapshot, categories, overrides] = await Promise.all([
-        activeProvider.load(),
+        provider.load(),
         db.finCategories(),
         db.finOverrides(),
       ]);
       const map = new Map(overrides.map((o) => [o.txId, o]));
       overridesRef.current = map;
-      setLoaded({ snapshot, categories, overrides: map, today: toISODate(new Date()) });
+      setLoaded({
+        snapshot,
+        categories,
+        overrides: map,
+        today: toISODate(new Date()),
+        source: provider.id === "import" ? "import" : "sample",
+        origin: provider.origin,
+      });
     } catch (err) {
       setError(message(err));
     }
@@ -171,7 +183,9 @@ export function useFinance(onError: (message: string) => void) {
     reload: load,
     today: loaded?.today ?? toISODate(new Date()),
     snapshot: loaded?.snapshot ?? null,
-    origin: activeProvider.origin,
+    origin: loaded?.origin ?? ("sample" as DataOrigin),
+    /** "sample" until the person imports an account, then "import". */
+    source: loaded?.source ?? ("sample" as const),
     categories: categories ?? [],
     categoriesById,
     transactions,

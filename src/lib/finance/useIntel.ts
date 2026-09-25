@@ -11,6 +11,8 @@ import {
   type InsightState,
 } from "./intel";
 import { fingerprint } from "./fingerprint";
+import { planOsNotifications } from "./notify";
+import { ensureNotificationPermission, showOsNotifications } from "../osNotify";
 import { DEFAULT_PREFS, type DetectorId, type FinancePreferences } from "./prefs";
 import type { AskContext } from "./ask";
 import type { Finance } from "./useFinance";
@@ -152,6 +154,62 @@ export function useIntel(finance: Finance, plans: Plans, planning: Planning, onE
   const notifications = useMemo(() => notificationsFor(items, prefs ?? DEFAULT_PREFS), [items, prefs]);
   const dismissed = useMemo(() => (states ?? []).filter((s) => s.status === "dismissed"), [states]);
 
+  /** Record that findings were shown as system notifications. Committed at once, so a re-run can't show them twice. */
+  const markOsNotified = useCallback(
+    (ids: string[]) => {
+      const wanted = new Set(ids);
+      const now = new Date().toISOString();
+      const changed: InsightState[] = [];
+      const next = (statesRef.current ?? []).map((st) => {
+        if (!wanted.has(st.id) || st.osNotified) return st;
+        const updated = { ...st, osNotified: true, updatedAt: now };
+        changed.push(updated);
+        return updated;
+      });
+      if (changed.length === 0) return;
+      commit(next);
+      void (async () => {
+        try {
+          for (const st of changed) await db.saveInsightState(st);
+        } catch (err) {
+          onError(`That didn't save. ${message(err)}`);
+        }
+      })();
+    },
+    [commit, onError],
+  );
+
+  // Show new findings as system notifications, once each, if the person has turned that on.
+  useEffect(() => {
+    if (!ready || !prefs?.systemNotifications) return;
+    const plan = planOsNotifications(notifications);
+    if (plan.markIds.length === 0) return;
+    markOsNotified(plan.markIds);
+    void showOsNotifications(plan.show).then((result) => {
+      if (result === "denied") {
+        void savePrefs({ ...prefs, systemNotifications: false });
+        onError("System notifications are switched off for ZeraphDesk in your system settings, so they're off here too.");
+      }
+    });
+  }, [ready, prefs, notifications, markOsNotified, savePrefs, onError]);
+
+  const setSystemNotifications = useCallback(
+    async (on: boolean) => {
+      if (!prefs) return;
+      if (on) {
+        if (!(await ensureNotificationPermission())) {
+          onError("Your system didn't allow notifications for ZeraphDesk. You can allow them in your system's notification settings.");
+          return;
+        }
+        // Turning this on doesn't announce what's already there.
+        markOsNotified((statesRef.current ?? []).filter((st) => st.status === "open" && !st.osNotified).map((st) => st.id));
+      }
+      await savePrefs({ ...prefs, systemNotifications: on });
+      await db.log(newEvent("system_notifications_changed", null, { on: on ? 1 : 0 }));
+    },
+    [prefs, markOsNotified, savePrefs, onError],
+  );
+
   const activity = useMemo(
     () =>
       buildActivity({
@@ -208,6 +266,7 @@ export function useIntel(finance: Finance, plans: Plans, planning: Planning, onE
     hideNotification,
     markAllRead,
     savePrefs,
+    setSystemNotifications,
     reloadEvents,
   };
 }

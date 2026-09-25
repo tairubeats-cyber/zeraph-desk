@@ -124,9 +124,10 @@ wording and structure.
   deterministically, and labelled "Sample data" on every finance screen and every
   account. Don't add a "Connect" button until a provider really exists, and don't
   claim bank-level security, certifications, regulation or advisor status.
-- **Stored vs. provided.** SQLite holds only the user's own choices
-  (`fin_categories`, `fin_tx_overrides`). Account and transaction data is never
-  copied into it.
+- **Stored vs. provided.** SQLite holds the user's own choices (`fin_categories`,
+  `fin_tx_overrides`, and so on). The sample provider's accounts and transactions are
+  never copied into it. The one exception is data the person imports themselves: it lives
+  in `fin_src_*` and is read only by the imported provider.
 - **Money is integer cents** (`formatMoney` in `money.ts`). Liability balances are
   stored as positive amounts; `ACCOUNT_KINDS[kind].class` says which side they're on.
 - **Categories are data, not code.** Refer to them by id. Kind is `income`,
@@ -214,13 +215,38 @@ wording and structure.
   - *Investment findings:* `investments-drop` (down 10% or more over 30 days after counting
     deposits) and `concentration` (a single stock 15% or more; funds don't count). Both are
     off-limits for advice wording.
+- **Real data without a bank connection (phase 6).** `pickProvider()` returns the imported
+  provider once the person has added an account, otherwise the sample. Imported data is
+  real (no sample notice) but it is not a bank connection and is never described as one;
+  balances are what the person entered or the file's balance column said.
+  - *Files are read on this computer* (`csv.ts`, an `<input type="file">`); nothing is uploaded.
+    A row that can't be read is reported with its line number, never guessed at. Columns,
+    date order and which sign means money out are detected, shown, and changeable; an
+    ambiguous date order is asked, not assumed.
+  - *Row ids are a hash of account, date, amount, description and the count of identical
+    rows earlier in the file*, so re-importing adds nothing, an overlapping file adds only
+    the new rows, and category corrections keep pointing at the same rows.
+  - *Category guesses are derived, not stored.* Only a category the file itself named is
+    stored; the keyword guess is computed when the data is read, so a better guesser fixes
+    rows already imported. The transfer rule is deliberately strict: a line wrongly called a
+    transfer vanishes from spending, which is worse than one left as "Other".
+  - *Balance history for imported accounts* is the balance snapshots (`fin_src_balances`):
+    what the person entered and the file's balance column. Same gap rule as everywhere.
+  - *System notifications* (`notify.ts`, `osNotify.ts`) are off until the person turns them
+    on, only for findings in categories they left on, once each (`os_notified`), rolled up
+    past three. Turning them on doesn't announce what's already there. They show while the
+    app is open; there is no background service. They carry the finding's title and summary.
+  - *Not built, on purpose:* syncing with a bank through an aggregator, and background jobs
+    that need one. Both wait on choosing a provider and where its access tokens live, which
+    also changes what the Security screen may claim. Don't fake either.
 - **Seeding is idempotent.** Default rows go in with INSERT OR IGNORE behind a
   single shared promise, never "insert if the table is empty"; concurrent loads
   once left categories missing.
 - **Order of work:** phases 1 to 5 done (shell, Overview, Accounts, Transactions; Recurring,
   Bills, Cash Flow, Budgets, Goals; Action Center, Activity, Ask, notifications,
   Preferences; Forecast, Scenarios, Debt, Net Worth; Investments with portfolio analysis
-  and the long-term plan). Next: real provider infrastructure (phase 6). Don't fake a later phase inside an earlier one.
+  and the long-term plan). Phase 6 is partly done: file import, balance snapshots and system
+  notifications. Aggregator sync and background jobs wait on a provider decision. Don't fake a later phase inside an earlier one.
 
 ## Trades
 

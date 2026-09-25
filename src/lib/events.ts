@@ -27,7 +27,9 @@ export type EventKind =
   | "holding_changed"
   | "planned_item_added"
   | "scenario_saved"
-  | "long_term_changed";
+  | "long_term_changed"
+  | "data_imported"
+  | "system_notifications_changed";
 
 export interface Event {
   id: ID;

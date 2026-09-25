@@ -10,7 +10,7 @@
 /** Where a piece of data came from. The UI labels anything that isn't `provider`. */
 export type DataOrigin = "sample" | "provider";
 
-export type ConnectionStatus = "sample" | "connected" | "needs_attention" | "disconnected";
+export type ConnectionStatus = "sample" | "imported" | "connected" | "needs_attention" | "disconnected";
 
 export type AccountKind =
   | "checking"
@@ -431,4 +431,32 @@ export interface LongTermAssumptions {
   targetCents: number | null;
   /** Yearly inflation in basis points, for showing today's-money values. 0 shows plain future dollars. */
   inflationBps: number;
+}
+
+// --- Phase 6: data the person imports ------------------------------------------------
+
+/** An account the person added and fills with imported files. Not read from any bank. */
+export interface ImportedAccount {
+  id: string;
+  name: string;
+  kind: AccountKind;
+  /** As the person typed it. */
+  institution: string;
+  mask: string | null;
+  /** The latest balance on record; the size of it, so owed amounts are positive. */
+  balanceCents: number;
+  createdAt: string;
+}
+
+export interface ImportRecord {
+  id: string;
+  accountId: string;
+  at: string;
+  fileName: string;
+  rowsTotal: number;
+  added: number;
+  /** Rows that were already there. */
+  skipped: number;
+  /** Rows that couldn't be read. */
+  invalid: number;
 }

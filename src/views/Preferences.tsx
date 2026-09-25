@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -47,6 +47,7 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 
 export function Preferences({ intel }: { intel: Intel }) {
   const { prefs } = intel;
+  const [osBusy, setOsBusy] = useState(false);
   const setNotify = (key: NotificationCategory, on: boolean) => void intel.savePrefs({ ...prefs, notify: { ...prefs.notify, [key]: on } });
   const setWatch = (key: DetectorId, on: boolean) => void intel.savePrefs({ ...prefs, watch: { ...prefs.watch, [key]: on } });
 
@@ -69,6 +70,27 @@ export function Preferences({ intel }: { intel: Intel }) {
               )}
             />
           ))}
+        </Section>
+
+        <Section
+          title="System notifications"
+          hint="Off by default. When on, a new finding also appears as a notification from your operating system. It shows the finding's title and summary, amounts included, so anyone who can see your screen can read it. Notifications appear while ZeraphDesk is open; it doesn't run in the background once it's closed."
+        >
+          <Row
+            title="Show findings as system notifications"
+            description="Only findings in the categories above are shown, once each. Turning this on doesn't announce what's already there."
+            control={(labelId) => (
+              <Switch
+                aria-labelledby={labelId}
+                checked={prefs.systemNotifications}
+                disabled={osBusy}
+                onChange={(on) => {
+                  setOsBusy(true);
+                  void intel.setSystemNotifications(on).finally(() => setOsBusy(false));
+                }}
+              />
+            )}
+          />
         </Section>
 
         <Section title="Thresholds" hint="Used by the checks below. Nothing here changes your accounts.">
@@ -117,8 +139,7 @@ export function Preferences({ intel }: { intel: Intel }) {
         </Section>
 
         <p className="max-w-[70ch] px-1 text-meta text-ink-tertiary">
-          Changes in balances, investments and debt can't be watched yet, because ZeraphDesk doesn't keep balance history.
-          They'll appear here when it does.
+          Changes in debt balances can't be watched yet. They'll appear here when they can.
         </p>
       </div>
     </div>

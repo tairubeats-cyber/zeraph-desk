@@ -42,9 +42,16 @@ fn main() {
             sql: include_str!("../migrations/006_planning.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 7,
+            description: "finance imported data and notification tracking",
+            sql: include_str!("../migrations/007_import.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
         .plugin(
             tauri_plugin_sql::Builder::default()
                 .add_migrations("sqlite:zeraph.db", migrations)

@@ -69,6 +69,8 @@ export interface FinancePreferences {
   notify: Record<NotificationCategory, boolean>;
   /** Which detectors run at all. */
   watch: Record<DetectorId, boolean>;
+  /** Also show new findings as system notifications, while ZeraphDesk is open. Off until the person turns it on. */
+  systemNotifications: boolean;
 }
 
 export const DEFAULT_PREFS: FinancePreferences = {
@@ -76,6 +78,7 @@ export const DEFAULT_PREFS: FinancePreferences = {
   billLeadDays: 3,
   notify: { money: true, bills: true, goals: true, investments: true, security: true, system: true },
   watch: Object.fromEntries(DETECTORS.map((d) => [d.id, true])) as Record<DetectorId, boolean>,
+  systemNotifications: false,
 };
 
 /** Read saved preferences, filling anything missing or malformed from the defaults. */
@@ -92,5 +95,6 @@ export function mergePrefs(saved: unknown): FinancePreferences {
     billLeadDays: Number.isFinite(lead) && lead >= 0 && lead <= 30 ? Math.round(lead) : DEFAULT_PREFS.billLeadDays,
     notify,
     watch,
+    systemNotifications: bool(s.systemNotifications, false),
   };
 }

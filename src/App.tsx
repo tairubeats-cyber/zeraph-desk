@@ -158,9 +158,9 @@ export default function App() {
           />
         );
       case "connections":
-        return <Connections />;
+        return <Connections finance={finance} onNotify={flash} />;
       case "security":
-        return <Security />;
+        return <Security source={finance.source} />;
       case "more":
         return <AllSections onOpen={open} />;
       default:

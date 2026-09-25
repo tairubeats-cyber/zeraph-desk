@@ -6,6 +6,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TextField } from "@/components/ui/field";
 import { PageHeader } from "../components/PageHeader";
+import { FinancialData } from "@/components/finance/FinancialData";
+import type { Finance } from "@/lib/finance/useFinance";
 
 const EMPTY_MAIL_FORM = {
   address: "",
@@ -28,7 +30,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-export function Connections() {
+export function Connections({ finance, onNotify }: { finance: Finance; onNotify: (message: string) => void }) {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [mailOpen, setMailOpen] = useState(false);
@@ -87,9 +89,13 @@ export function Connections() {
 
   return (
     <div>
-      <PageHeader title="Connections" description="The email account and service seat ZeraphDesk uses." />
+      <PageHeader title="Connections" description="Your financial data, and the email account and service seat ZeraphDesk uses." />
 
       <div className="space-y-8">
+        <Section title="Financial data">
+          <FinancialData finance={finance} onNotify={onNotify} />
+        </Section>
+
         <Section title="Email">
           <Card className="p-5 md:p-6">
             <div className="flex items-start justify-between gap-4 max-md:flex-col">
@@ -226,7 +232,7 @@ export function Connections() {
   );
 }
 
-export function Security() {
+export function Security({ source }: { source: "sample" | "import" }) {
   return (
     <div>
       <PageHeader title="Security" description="What stays on this computer, and what leaves it." />
@@ -240,8 +246,10 @@ export function Security() {
               train a model.
             </p>
             <p className="max-w-[56ch] text-body text-ink-secondary">
-              Finance: nothing. The finance screens don't connect to a bank or to any service yet, and the
-              figures you see are sample data.
+              Finance: nothing. The finance screens don't connect to a bank or to any service.{" "}
+              {source === "import"
+                ? "The figures you see come from files you imported, which are read on this computer and never uploaded."
+                : "The figures you see are sample data. If you import your own files they're read on this computer and never uploaded."}
             </p>
           </Card>
         </Section>
@@ -250,7 +258,8 @@ export function Security() {
           <Card className="p-5 md:p-6">
             <p className="max-w-[56ch] text-body text-ink-secondary">
               Your email app password is held in this computer's keychain. Everything else, including your
-              categories, notes and drafts, is stored in a database file on this computer.
+              categories, notes, drafts and any accounts and transactions you import, is stored in a database file on this computer.
+              It isn't encrypted by ZeraphDesk, so anyone who can open your user account on this computer can read it.
             </p>
           </Card>
         </Section>

@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 
 const STATUS: Record<ConnectionStatus, { label: string; tone: string }> = {
   sample: { label: "Sample data", tone: "bg-surface-secondary text-ink-secondary" },
+  imported: { label: "Imported", tone: "bg-surface-secondary text-ink-secondary" },
   connected: { label: "Connected", tone: "bg-success-soft text-success" },
   needs_attention: { label: "Needs attention", tone: "bg-warning-soft text-warning" },
   disconnected: { label: "Disconnected", tone: "bg-surface-secondary text-ink-secondary" },
@@ -134,10 +135,11 @@ export function Accounts({ finance, planning }: { finance: Finance; planning: Pl
       </div>
 
       <Card className="mt-8 p-5">
-        <h2 className="text-heading text-ink">Connecting real accounts</h2>
+        <h2 className="text-heading text-ink">{finance.source === "import" ? "Where these came from" : "Using your own accounts"}</h2>
         <p className="mt-2 max-w-[62ch] text-body text-ink-secondary">
-          ZeraphDesk can't connect to a bank yet. That needs a financial-data provider, which hasn't been set up, so
-          nothing on this screen came from a real institution.
+          {finance.source === "import"
+            ? "You added these accounts and imported their transactions from files. ZeraphDesk can't connect to a bank, so balances change only when you update them or import again. You can do both under Connections."
+            : "ZeraphDesk can't connect to a bank yet, so nothing on this screen came from a real institution. To use your own numbers, add an account and import the file your bank lets you download, under Connections."}
         </p>
       </Card>
     </div>
