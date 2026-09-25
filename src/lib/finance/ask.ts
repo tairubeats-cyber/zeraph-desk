@@ -14,17 +14,24 @@
  */
 import type { ViewKey } from "../../nav";
 import type {
+  BalancePoint,
   Basis,
   Category,
+  DebtTerms,
   FinancialAccount,
   Goal,
   GoalContribution,
+  Holding,
+  PlannedItem,
   RecurringPayment,
   ResolvedTransaction,
 } from "./types";
 import { ACCOUNT_GROUPS, ACCOUNT_KINDS } from "./types";
 import type { TxFilters } from "./filters";
 import { accountTotals } from "./analysis";
+import { modellableDebts, simulatePayoff } from "./debt";
+import { buildForecast } from "./forecast";
+import { netWorthHistory, netWorthNow, RANGES, SLICE_LABELS } from "./networth";
 import { average, completeMonths, monthlyFlows, upcoming } from "./cashflow";
 import { budgetRows } from "./budget";
 import { goalProgress } from "./goals";
@@ -53,6 +60,10 @@ export interface AskContext {
   budgets: Map<string, number>;
   goals: Goal[];
   contributions: GoalContribution[];
+  holdings: Holding[];
+  history: BalancePoint[];
+  debtTerms: Map<string, DebtTerms>;
+  planned: PlannedItem[];
 }
 
 export interface AnswerLink {
@@ -86,6 +97,9 @@ export const SUGGESTED_QUESTIONS = [
   "How much can I put toward my goals based on my cash flow?",
   "Am I within my budgets?",
   "What's my net worth?",
+  "How has my net worth changed?",
+  "Will I run low on cash in the next 30 days?",
+  "When will I be debt free?",
 ];
 
 // ---------------------------------------------------------------- language
@@ -463,29 +477,133 @@ function goalsStatus(c: AskContext, q: string): Answer {
 }
 
 function netWorth(c: AskContext, q: string): Answer {
-  const t = accountTotals(c.accounts);
+  const t = netWorthNow(c.accounts, c.holdings);
   const groups = ACCOUNT_GROUPS.map((g) => ({
     label: g.label,
     cents: c.accounts.filter((a) => ACCOUNT_KINDS[a.kind].group === g.key).reduce((s, a) => s + a.balanceCents, 0),
     owed: g.key === "credit" || g.key === "loans",
-  })).filter((g) => g.cents > 0);
+  }));
+  if (t.otherAssetsCents > 0) groups.push({ label: "Homes, vehicles and other assets you entered", cents: t.otherAssetsCents, owed: false });
+  if (t.otherDebtCents > 0) groups.push({ label: "Other debts you entered", cents: t.otherDebtCents, owed: true });
   return frame(c, q, {
     headline: `Your net worth is ${formatMoney(t.netWorthCents)}: ${formatMoney(t.assetsCents)} in assets minus ${formatMoney(t.liabilitiesCents)} owed.`,
-    table: { columns: ["Group", "Balance"], rows: groups.map((g) => [g.label, `${formatMoney(g.cents)}${g.owed ? " owed" : ""}`]) },
-    used: [`${c.accounts.length} account balances as last reported`],
-    links: [{ label: "Open accounts", view: "accounts" }],
+    table: { columns: ["Group", "Balance"], rows: groups.filter((g) => g.cents > 0).map((g) => [g.label, `${formatMoney(g.cents)}${g.owed ? " owed" : ""}`]) },
+    used: [`${c.accounts.length} account balances as last reported`, ...(c.holdings.length ? [`${c.holdings.length} ${c.holdings.length === 1 ? "item" : "items"} you entered by hand`] : [])],
+    links: [{ label: "Open net worth", view: "net-worth" }],
   });
 }
 
 function netWorthWhy(c: AskContext, q: string): Answer {
-  const t = accountTotals(c.accounts);
+  const t = netWorthNow(c.accounts, c.holdings);
+  if (c.history.length === 0) {
+    return frame(c, q, {
+      answered: false,
+      headline: "I can't say how your net worth changed, because this data doesn't include past balances.",
+      paragraphs: [`I can tell you where it stands today: ${formatMoney(t.netWorthCents)}. Without earlier balances to compare, any explanation would be a guess, so I won't offer one.`],
+      used: ["Current balances only. There is no balance history."],
+      links: [{ label: "Open cash flow", view: "cash-flow" }],
+    });
+  }
+  const said = q.toLowerCase();
+  const range = /year|12 months|annual/.test(said) ? RANGES[3] : /90|three months|quarter/.test(said) ? RANGES[2] : RANGES[1];
+  const h = netWorthHistory(c.accounts, c.history, c.holdings, c.today, range);
+  const first = h.points[0];
+  const delta = t.netWorthCents - first.netWorthCents;
+  const words = range.days === 365 ? "the last year" : `the last ${range.days} days`;
+  const lead = /\bwhy\b/.test(said) ? "I can show what moved, though not why. " : "";
   return frame(c, q, {
-    answered: false,
-    headline: "I can't say why your net worth changed, because ZeraphDesk doesn't keep past balances yet.",
-    paragraphs: [`I can tell you where it stands today: ${formatMoney(t.netWorthCents)}. Without earlier balances to compare, any explanation would be a guess, so I won't offer one.`],
-    used: ["Current balances only. There is no balance history."],
-    notes: ["Net worth history is planned. Until then, cash flow shows how much you took in and spent each month."],
-    links: [{ label: "Open cash flow", view: "cash-flow" }],
+    headline:
+      lead +
+      (delta === 0
+        ? `Your net worth is the same as it was ${words} ago, ${formatMoney(t.netWorthCents)}.`
+        : `Your net worth is ${delta > 0 ? "up" : "down"} ${formatMoney(Math.abs(delta))} over ${words}, from ${formatMoney(first.netWorthCents)} to ${formatMoney(t.netWorthCents)}.`),
+    table: {
+      columns: ["Group", `${day(h.from)}`, "Today", "Effect on net worth"],
+      rows: h.slices.map((r) => [
+        SLICE_LABELS[r.slice] + (r.owed ? " (owed)" : ""),
+        formatMoney(r.startCents),
+        formatMoney(r.endCents),
+        formatMoney(r.owed ? r.startCents - r.endCents : r.endCents - r.startCents, { signed: true }),
+      ]),
+    },
+    used: [`Account balances from ${day(h.from)} to today`, ...h.notes],
+    notes: ["This shows which balances moved, not why. ZeraphDesk can't tell whether a change came from saving, spending, paying down debt or the market."],
+    links: [{ label: "Open net worth", view: "net-worth" }],
+  });
+}
+
+function forecastAnswer(c: AskContext, q: string): Answer {
+  const asked = q.match(/(\d+) days?/);
+  const days = asked ? Math.min(180, Math.max(1, Number(asked[1]))) : /end of (the )?month/.test(q) ? Math.max(1, Number(endOfMonth(c.today).slice(8)) - dayOfMonth(c.today)) : 30;
+  const f = buildForecast({
+    today: c.today,
+    days,
+    accounts: c.accounts,
+    transactions: c.transactions,
+    categories: kindMap(c),
+    recurring: c.recurring,
+    planned: c.planned,
+    includeEveryday: true,
+  });
+  if (!f) {
+    return frame(c, q, { answered: false, headline: "I can't project that: there's no checking or cash account to follow.", basis: "projection", used: [] });
+  }
+  const names = f.accounts.map((a) => a.name).join(", ");
+  const end = f.points[f.points.length - 1].date;
+  const below = f.firstBelowZero;
+  const biggest = [...f.events].sort((a, b) => Math.abs(b.amountCents) - Math.abs(a.amountCents)).slice(0, 6);
+  return frame(c, q, {
+    headline: below
+      ? `At this pace, ${names} is projected to go below $0 around ${dayLong(below)}. That's an estimate, not a certainty.`
+      : `${names} is projected to hold above $0 for the next ${days} days, ending near ${formatMoney(f.endCents)} on ${day(end)}. That's an estimate, not a promise.`,
+    facts: [
+      { label: "Balance today (reported)", value: formatMoney(f.startCents) },
+      { label: `Projected on ${day(end)}`, value: formatMoney(f.endCents) },
+      { label: "Lowest projected", value: `${formatMoney(f.lowest.balanceCents)} around ${day(f.lowest.date)}` },
+    ],
+    table: {
+      title: "Largest expected items",
+      columns: ["Date", "Item", "Amount"],
+      rows: biggest.map((e) => [day(e.date), e.label, formatMoney(e.amountCents, { signed: true, cents: true })]),
+    },
+    used: [
+      `Recurring payments and income expected on ${names}`,
+      ...(c.planned.length ? ["Items you planned"] : []),
+      "A steady estimate of everyday spending from the last few months",
+    ],
+    notes: [...f.notes, "It assumes each payment arrives on its usual date for its usual amount."],
+    links: [{ label: "Open forecast", view: "forecast" }],
+    basis: "projection",
+  });
+}
+
+function debtFreeAnswer(c: AskContext, q: string): Answer {
+  const debts = modellableDebts(c.accounts, c.debtTerms);
+  if (debts.length === 0) {
+    return frame(c, q, {
+      answered: false,
+      headline: "I can't estimate a payoff date yet: none of your debts has a rate and monthly payment entered.",
+      paragraphs: ["A payoff date needs the interest rate and what you pay each month. ZeraphDesk can't work those out from a balance. Add them on the Debt page and ask again."],
+      basis: "projection",
+      used: [],
+      links: [{ label: "Open debt", view: "debt" }],
+    });
+  }
+  const r = simulatePayoff(debts, c.today);
+  const missing = c.accounts.filter((a) => ACCOUNT_KINDS[a.kind].class === "liability" && a.balanceCents > 0 && !debts.some((d) => d.id === a.id));
+  const when = (iso: string | null) => (iso ? `${monthLabel(monthKey(iso))} ${iso.slice(0, 4)}` : "Not within 50 years");
+  return frame(c, q, {
+    headline: r.payoffDate
+      ? `At the payments you entered, ${missing.length ? "the debts with a rate and payment are" : "your debts are"} projected to be paid off around ${when(r.payoffDate)}, with about ${formatMoney(r.totalInterestCents)} in interest.`
+      : "At the payments you entered, at least one debt isn't projected to be paid off within 50 years.",
+    table: { columns: ["Debt", "Owed", "Rate", "Payment", "Paid off"], rows: debts.map((d) => [d.name, formatMoney(d.balanceCents), `${(d.aprBps / 100).toFixed(2)}%`, formatMoney(d.paymentCents, { cents: true }), when(r.perDebt.find((p) => p.id === d.id)?.payoffDate ?? null)]) },
+    used: ["The rates and payments you entered under Debt", "Interest compounding monthly, with no new charges"],
+    notes: [
+      ...(missing.length ? [`${missing.map((a) => a.name).join(", ")} ${missing.length === 1 ? "has" : "have"} no rate or payment entered, so ${missing.length === 1 ? "it isn't" : "they aren't"} counted.`] : []),
+      "Real statements round slightly differently, so treat the date as close, not exact.",
+    ],
+    links: [{ label: "Open debt", view: "debt" }],
+    basis: "projection",
   });
 }
 
@@ -551,6 +669,8 @@ export function answer(question: string, c: AskContext): Answer {
   const p = parsePeriod(q, c.today);
 
   if (/net worth|worth/.test(q)) return /(why|what|how).*(change|changed|move|moved|drop|dropped|go up|went up|go down|went down|differ)|change.*net worth/.test(q) ? netWorthWhy(c, question) : netWorth(c, question);
+  if (/(debt.?free|pay(ing)? (it |them |my \w+ )?off|payoff|pay down)/.test(q) || (/when (will|do) i/.test(q) && /(debt|loan|card|mortgage)/.test(q))) return debtFreeAnswer(c, question);
+  if (/(run (out|low|short)|go (negative|below zero|overdrawn)|overdraft|will i have enough|forecast|projected|project my|what will my (balance|cash|checking)|balance (in|by|after|at the end)|cash (in|by|at the end of))/.test(q)) return forecastAnswer(c, question);
   if (/(compared|compare|versus|vs)\b.*\b(last|previous) month|what changed|how (does|is) this month/.test(q)) return compareMonths(c, question);
   if (/\bbills?\b/.test(q) && /(coming|upcoming|due|next|soon|owe)/.test(q)) return billsComing(c, question);
   if (/subscriptions?/.test(q)) return subscriptions(c, question);

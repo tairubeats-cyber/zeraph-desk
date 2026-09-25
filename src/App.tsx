@@ -13,6 +13,10 @@ import { Bills } from "./views/Bills";
 import { Recurring } from "./views/Recurring";
 import { Budgets } from "./views/Budgets";
 import { Goals } from "./views/Goals";
+import { Forecast } from "./views/Forecast";
+import { Scenarios } from "./views/Scenarios";
+import { NetWorth } from "./views/NetWorth";
+import { Debt } from "./views/Debt";
 import { ActionCenter } from "./views/ActionCenter";
 import { Activity } from "./views/Activity";
 import { Ask, type Asked } from "./views/Ask";
@@ -28,6 +32,7 @@ import { emailConnector } from "./connectors/email";
 import { syncInbox, proposeFollowUps } from "./lib/sync";
 import { useFinance } from "./lib/finance/useFinance";
 import { usePlans } from "./lib/finance/usePlans";
+import { usePlanning } from "./lib/finance/usePlanning";
 import { useIntel } from "./lib/finance/useIntel";
 import { answer } from "./lib/finance/ask";
 import { AskProvider } from "./components/finance/AskLink";
@@ -59,7 +64,8 @@ export default function App() {
 
   const finance = useFinance(flash);
   const plans = usePlans(finance, flash);
-  const intel = useIntel(finance, plans, flash);
+  const planning = usePlanning(flash);
+  const intel = useIntel(finance, plans, planning, flash);
 
   /** Work out an answer from the data on this computer and show it on the Ask screen. */
   const ask = useCallback(
@@ -94,9 +100,9 @@ export default function App() {
     if (!current.item.built) return <ComingSoon item={current.item} onOverview={() => open("overview")} />;
     switch (view) {
       case "overview":
-        return <Overview finance={finance} plans={plans} intel={intel} onOpen={open} />;
+        return <Overview finance={finance} plans={plans} planning={planning} intel={intel} onOpen={open} />;
       case "accounts":
-        return <Accounts finance={finance} />;
+        return <Accounts finance={finance} planning={planning} />;
       case "transactions":
         return <Transactions finance={finance} preset={txPreset} />;
       case "cash-flow":
@@ -109,6 +115,14 @@ export default function App() {
         return <Budgets finance={finance} plans={plans} />;
       case "goals":
         return <Goals finance={finance} plans={plans} />;
+      case "forecast":
+        return <Forecast finance={finance} plans={plans} planning={planning} />;
+      case "scenarios":
+        return <Scenarios finance={finance} plans={plans} planning={planning} />;
+      case "net-worth":
+        return <NetWorth finance={finance} planning={planning} />;
+      case "debt":
+        return <Debt finance={finance} planning={planning} />;
       case "action-center":
         return <ActionCenter finance={finance} plans={plans} intel={intel} onOpen={open} onNotify={flash} />;
       case "activity":

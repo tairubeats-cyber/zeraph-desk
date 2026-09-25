@@ -22,7 +22,11 @@ export type EventKind =
   | "insight_detected"
   | "insight_dismissed"
   | "insight_reopened"
-  | "preferences_changed";
+  | "preferences_changed"
+  | "debt_terms_saved"
+  | "holding_changed"
+  | "planned_item_added"
+  | "scenario_saved";
 
 export interface Event {
   id: ID;

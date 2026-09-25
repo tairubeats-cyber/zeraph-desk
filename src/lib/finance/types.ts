@@ -131,6 +131,8 @@ export interface FinancialSnapshot {
   connections: Connection[];
   accounts: FinancialAccount[];
   transactions: Transaction[];
+  /** Past balances, when the provider has them. Empty otherwise. */
+  balanceHistory: BalancePoint[];
 }
 
 /**
@@ -261,4 +263,106 @@ export interface GoalContribution {
   amountCents: number;
   date: string;
   note: string;
+}
+
+// --- Phase 4: planning ------------------------------------------------------------
+
+/**
+ * One reported balance for one account on one day. Like `FinancialAccount.balanceCents`
+ * it is the size of the balance, never negative: a card that owed $900 is 90000.
+ * A provider that has history supplies it; one that doesn't leaves it empty and the
+ * Net Worth screen says so rather than inventing a past.
+ */
+export interface BalancePoint {
+  accountId: string;
+  date: string;
+  balanceCents: number;
+}
+
+export type HoldingKind = "real_estate" | "vehicle" | "other_asset" | "other_debt";
+
+export const HOLDING_KINDS: Record<HoldingKind, { label: string; class: AccountClass }> = {
+  real_estate: { label: "Real estate", class: "asset" },
+  vehicle: { label: "Vehicle", class: "asset" },
+  other_asset: { label: "Other asset", class: "asset" },
+  other_debt: { label: "Other debt", class: "liability" },
+};
+
+/** One dated value the user entered for a holding. */
+export interface HoldingValue {
+  date: string;
+  valueCents: number;
+}
+
+/**
+ * Something that counts toward net worth but isn't an account: a home, a car,
+ * a loan from a relative. The value is whatever the user last entered; nothing
+ * here is read from anywhere. Values are sorted oldest first.
+ */
+export interface Holding {
+  id: string;
+  name: string;
+  kind: HoldingKind;
+  createdAt: string;
+  values: HoldingValue[];
+}
+
+/**
+ * What a debt costs and how it's being paid. Providers may supply this someday;
+ * until then the user enters it, and every screen that uses it says "you entered".
+ */
+export interface DebtTerms {
+  accountId: string;
+  /** Annual rate in basis points: 19.99% is 1999. */
+  aprBps: number | null;
+  minPaymentCents: number | null;
+  /** What's actually paid each month; null means the minimum. */
+  paymentCents: number | null;
+  /** Day of the month the payment is due, 1 to 31. */
+  dueDay: number | null;
+}
+
+/** A one-off expense or income the user expects, so the forecast can include it. */
+export interface PlannedItem {
+  id: string;
+  name: string;
+  date: string;
+  /** Always positive; `direction` says which way the money moves. */
+  amountCents: number;
+  direction: "in" | "out";
+}
+
+/** A payoff order when there are several debts and some extra money. */
+export type PayoffStrategy = "avalanche" | "snowball";
+
+export type ScenarioChange =
+  | { id: string; type: "save_more"; monthlyCents: number; goalId: string | null }
+  | { id: string; type: "extra_debt"; monthlyCents: number; target: "all" | string; strategy: PayoffStrategy }
+  /** Positive = more income each month, negative = less. */
+  | { id: string; type: "income"; monthlyCents: number }
+  /** Positive = a cost that goes up (rent), negative = one that comes down. */
+  | { id: string; type: "expense"; monthlyCents: number; label: string }
+  | {
+      id: string;
+      type: "purchase";
+      label: string;
+      priceCents: number;
+      downCents: number;
+      financed: boolean;
+      aprBps: number;
+      termMonths: number;
+      /** Which month from now it happens, 1 = next month. */
+      inMonths: number;
+      /** What the thing is still worth afterwards, 0 if it shouldn't count as an asset. */
+      valueCents: number;
+    }
+  | { id: string; type: "stop_subscription"; recurringKey: string };
+
+export interface Scenario {
+  id: string;
+  name: string;
+  horizonMonths: number;
+  changes: ScenarioChange[];
+  createdAt: string;
+  updatedAt: string;
 }

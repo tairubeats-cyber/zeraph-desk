@@ -4,7 +4,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { AskLink } from "@/components/finance/AskLink";
 import { LoadFailed, LoadingBlock, SampleNotice } from "@/components/finance/parts";
 import type { Finance } from "@/lib/finance/useFinance";
-import { accountTotals } from "@/lib/finance/analysis";
+import type { Planning } from "@/lib/finance/usePlanning";
+import { netWorthNow } from "@/lib/finance/networth";
 import { formatMoney } from "@/lib/finance/money";
 import {
   ACCOUNT_GROUPS,
@@ -26,7 +27,7 @@ function updated(c: Connection | undefined): string {
   return new Date(c.lastSyncedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-export function Accounts({ finance }: { finance: Finance }) {
+export function Accounts({ finance, planning }: { finance: Finance; planning: Planning }) {
   const { status, snapshot } = finance;
 
   const grouped = useMemo(() => {
@@ -48,9 +49,10 @@ export function Accounts({ finance }: { finance: Finance }) {
   }, [snapshot]);
 
   if (status === "error") return <LoadFailed message={finance.error ?? ""} onRetry={finance.reload} />;
-  if (!snapshot || !grouped || status === "loading") return <LoadingBlock label="Loading accounts…" />;
+  if (!snapshot || !grouped || status === "loading" || planning.status === "loading") return <LoadingBlock label="Loading accounts…" />;
 
-  const totals = accountTotals(snapshot.accounts);
+  const totals = netWorthNow(snapshot.accounts, planning.holdings);
+  const entered = totals.otherAssetsCents + totals.otherDebtCents;
 
   return (
     <div>
@@ -73,6 +75,12 @@ export function Accounts({ finance }: { finance: Finance }) {
           </div>
         ))}
       </Card>
+
+      {entered > 0 && (
+        <p className="-mt-2 mb-4 px-1 text-label font-normal text-ink-tertiary">
+          These totals include {formatMoney(totals.otherAssetsCents)} of assets and {formatMoney(totals.otherDebtCents)} of debts you added under Net Worth. The accounts below are only the ones ZeraphDesk reads.
+        </p>
+      )}
 
       <div className="space-y-6">
         {grouped.map((g) => (

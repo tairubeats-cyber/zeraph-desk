@@ -127,8 +127,8 @@ export const GROUPS: NavGroup[] = [
     items: [
       { key: "budgets", label: "Budgets", icon: ChartPie, built: true, phase: 2, about: "Monthly and category budgets: budget, actual, remaining and projected." },
       { key: "goals", label: "Goals", icon: Target, built: true, phase: 2, about: "Savings and payoff goals, with progress and the monthly amount each one needs." },
-      { key: "forecast", label: "Forecast", icon: ChartLine, built: false, phase: 4, about: "A projection of your balance from known income, bills and payments. A projection, never a promise." },
-      { key: "scenarios", label: "Scenarios", icon: SlidersHorizontal, built: false, phase: 4, about: "What-if planning: see how a change could move your cash flow, goals and net worth." },
+      { key: "forecast", label: "Forecast", icon: ChartLine, built: true, phase: 4, about: "A projection of your balance from known income, bills and payments. A projection, never a promise." },
+      { key: "scenarios", label: "Scenarios", icon: SlidersHorizontal, built: true, phase: 4, about: "What-if planning: see how a change could move your cash flow, goals and net worth." },
     ],
   },
   {
@@ -136,9 +136,9 @@ export const GROUPS: NavGroup[] = [
     label: "Wealth",
     icon: Scale,
     items: [
-      { key: "net-worth", label: "Net Worth", icon: Scale, built: false, phase: 4, about: "Assets minus liabilities over time, from today out to all time." },
+      { key: "net-worth", label: "Net Worth", icon: Scale, built: true, phase: 4, about: "Assets minus liabilities over time, from today out to all time." },
       { key: "investments", label: "Investments", icon: TrendingUp, built: false, phase: 5, about: "Portfolio value, holdings, allocation and performance." },
-      { key: "debt", label: "Debt", icon: CreditCard, built: false, phase: 4, about: "Balances, rates and payments, with estimates of how extra payments change the payoff date." },
+      { key: "debt", label: "Debt", icon: CreditCard, built: true, phase: 4, about: "Balances, rates and payments, with estimates of how extra payments change the payoff date." },
     ],
   },
   {

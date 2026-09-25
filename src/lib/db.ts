@@ -17,14 +17,20 @@ import type {
   Budget,
   Category,
   CategoryKind,
+  DebtTerms,
   Frequency,
   Goal,
   GoalContribution,
   GoalKind,
+  Holding,
+  HoldingKind,
   ManualRecurring,
   Necessity,
+  PlannedItem,
   RecurringMark,
   RecurringStatus,
+  Scenario,
+  ScenarioChange,
   TransactionOverride,
 } from "./finance/types";
 import { DEFAULT_CATEGORIES } from "./finance/categories";
@@ -690,6 +696,154 @@ export const db = {
     const handle = await open();
     await handle.execute("DELETE FROM fin_recurring_manual WHERE id = $1", [id]);
     await handle.execute("DELETE FROM fin_recurring_marks WHERE key = $1", [`manual:${id}`]);
+  },
+
+  // --- Finance phase 4: debt terms, holdings, planned items, scenarios. Only what the user entered. ---
+
+  async debtTerms(): Promise<DebtTerms[]> {
+    const handle = await open();
+    const rows = await handle.select<
+      {
+        account_id: string;
+        apr_bps: number | null;
+        min_payment_cents: number | null;
+        payment_cents: number | null;
+        due_day: number | null;
+      }[]
+    >("SELECT * FROM fin_debt_terms");
+    return rows.map((r) => ({
+      accountId: r.account_id,
+      aprBps: r.apr_bps,
+      minPaymentCents: r.min_payment_cents,
+      paymentCents: r.payment_cents,
+      dueDay: r.due_day,
+    }));
+  },
+
+  async saveDebtTerms(t: DebtTerms): Promise<void> {
+    const handle = await open();
+    await handle.execute(
+      `INSERT INTO fin_debt_terms (account_id, apr_bps, min_payment_cents, payment_cents, due_day, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT(account_id) DO UPDATE SET apr_bps = excluded.apr_bps, min_payment_cents = excluded.min_payment_cents,
+         payment_cents = excluded.payment_cents, due_day = excluded.due_day, updated_at = excluded.updated_at`,
+      [t.accountId, t.aprBps, t.minPaymentCents, t.paymentCents, t.dueDay, new Date().toISOString()],
+    );
+  },
+
+  async deleteDebtTerms(accountId: string): Promise<void> {
+    const handle = await open();
+    await handle.execute("DELETE FROM fin_debt_terms WHERE account_id = $1", [accountId]);
+  },
+
+  async holdings(): Promise<Holding[]> {
+    const handle = await open();
+    const rows = await handle.select<{ id: string; name: string; kind: string; created_at: string }[]>(
+      "SELECT * FROM fin_holdings ORDER BY created_at ASC",
+    );
+    const values = await handle.select<{ holding_id: string; date: string; value_cents: number }[]>(
+      "SELECT * FROM fin_holding_values ORDER BY date ASC",
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      kind: r.kind as HoldingKind,
+      createdAt: r.created_at,
+      values: values.filter((v) => v.holding_id === r.id).map((v) => ({ date: v.date, valueCents: v.value_cents })),
+    }));
+  },
+
+  async saveHolding(h: Holding): Promise<void> {
+    const handle = await open();
+    await handle.execute(
+      `INSERT INTO fin_holdings (id, name, kind, created_at) VALUES ($1, $2, $3, $4)
+       ON CONFLICT(id) DO UPDATE SET name = excluded.name, kind = excluded.kind`,
+      [h.id, h.name, h.kind, h.createdAt],
+    );
+  },
+
+  /** A value for a date replaces any earlier one for the same date. */
+  async saveHoldingValue(holdingId: string, date: string, valueCents: number): Promise<void> {
+    const handle = await open();
+    await handle.execute(
+      `INSERT INTO fin_holding_values (holding_id, date, value_cents) VALUES ($1, $2, $3)
+       ON CONFLICT(holding_id, date) DO UPDATE SET value_cents = excluded.value_cents`,
+      [holdingId, date, valueCents],
+    );
+  },
+
+  async deleteHolding(id: string): Promise<void> {
+    const handle = await open();
+    await handle.execute("DELETE FROM fin_holding_values WHERE holding_id = $1", [id]);
+    await handle.execute("DELETE FROM fin_holdings WHERE id = $1", [id]);
+  },
+
+  async plannedItems(): Promise<PlannedItem[]> {
+    const handle = await open();
+    const rows = await handle.select<
+      { id: string; name: string; date: string; amount_cents: number; direction: string }[]
+    >("SELECT * FROM fin_planned ORDER BY date ASC");
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      date: r.date,
+      amountCents: r.amount_cents,
+      direction: r.direction as PlannedItem["direction"],
+    }));
+  },
+
+  async savePlannedItem(p: PlannedItem): Promise<void> {
+    const handle = await open();
+    await handle.execute(
+      `INSERT INTO fin_planned (id, name, date, amount_cents, direction, created_at) VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT(id) DO UPDATE SET name = excluded.name, date = excluded.date,
+         amount_cents = excluded.amount_cents, direction = excluded.direction`,
+      [p.id, p.name, p.date, p.amountCents, p.direction, new Date().toISOString()],
+    );
+  },
+
+  async deletePlannedItem(id: string): Promise<void> {
+    const handle = await open();
+    await handle.execute("DELETE FROM fin_planned WHERE id = $1", [id]);
+  },
+
+  async scenarios(): Promise<Scenario[]> {
+    const handle = await open();
+    const rows = await handle.select<
+      { id: string; name: string; horizon_months: number; changes: string; created_at: string; updated_at: string }[]
+    >("SELECT * FROM fin_scenarios ORDER BY created_at ASC");
+    return rows.map((r) => {
+      let changes: ScenarioChange[] = [];
+      try {
+        const parsed: unknown = JSON.parse(r.changes);
+        if (Array.isArray(parsed)) changes = parsed as ScenarioChange[];
+      } catch {
+        /* a damaged scenario opens empty rather than breaking the screen */
+      }
+      return {
+        id: r.id,
+        name: r.name,
+        horizonMonths: r.horizon_months,
+        changes,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+      };
+    });
+  },
+
+  async saveScenario(s: Scenario): Promise<void> {
+    const handle = await open();
+    await handle.execute(
+      `INSERT INTO fin_scenarios (id, name, horizon_months, changes, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT(id) DO UPDATE SET name = excluded.name, horizon_months = excluded.horizon_months,
+         changes = excluded.changes, updated_at = excluded.updated_at`,
+      [s.id, s.name, s.horizonMonths, JSON.stringify(s.changes), s.createdAt, s.updatedAt],
+    );
+  },
+
+  async deleteScenario(id: string): Promise<void> {
+    const handle = await open();
+    await handle.execute("DELETE FROM fin_scenarios WHERE id = $1", [id]);
   },
 
   // --- Finance phase 3: preferences and the state of each finding. ---

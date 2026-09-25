@@ -106,3 +106,19 @@ export function parseMoney(input: string): number | null {
 export function moneyInputValue(cents: number): string {
   return cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2);
 }
+
+/**
+ * Read an interest rate someone typed: "19.99", "19.99%", "6". Returns basis
+ * points (19.99% is 1999), or null if it isn't a rate between 0% and 100%.
+ */
+export function parseRateBps(input: string): number | null {
+  const cleaned = input.replace(/[%\s]/g, "");
+  if (!/^\d*\.?\d{0,2}$/.test(cleaned) || cleaned === "" || cleaned === ".") return null;
+  const bps = Math.round(Number(cleaned) * 100);
+  return bps <= 10_000 ? bps : null;
+}
+
+/** The inverse, for filling a field: 1999 becomes "19.99" and 600 becomes "6". */
+export function rateInputValue(bps: number): string {
+  return bps % 100 === 0 ? String(bps / 100) : (bps / 100).toFixed(2).replace(/0$/, "");
+}

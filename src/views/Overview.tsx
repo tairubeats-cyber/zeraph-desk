@@ -13,11 +13,13 @@ import {
 } from "@/components/finance/parts";
 import type { Finance } from "@/lib/finance/useFinance";
 import type { Plans } from "@/lib/finance/usePlans";
+import type { Planning } from "@/lib/finance/usePlanning";
 import type { Intel } from "@/lib/finance/useIntel";
 import { ProgressBar } from "@/components/finance/inputs";
 import { upcoming } from "@/lib/finance/cashflow";
 import { goalProgress } from "@/lib/finance/goals";
-import { accountTotals, flowForMonth, spendingByCategory } from "@/lib/finance/analysis";
+import { flowForMonth, spendingByCategory } from "@/lib/finance/analysis";
+import { netWorthNow } from "@/lib/finance/networth";
 import { dayOfMonth, formatMoney, monthKey, monthLabel, parseISODate, recentMonthKeys, shiftMonth } from "@/lib/finance/money";
 import type { TxFilters } from "@/lib/finance/filters";
 import type { ViewKey } from "@/nav";
@@ -25,6 +27,7 @@ import type { ViewKey } from "@/nav";
 interface Props {
   finance: Finance;
   plans: Plans;
+  planning: Planning;
   intel: Intel;
   onOpen: (view: ViewKey, filters?: Partial<TxFilters>) => void;
 }
@@ -41,7 +44,7 @@ function difference(nowCents: number, thenCents: number): string {
   return `${formatMoney(Math.abs(d))} ${d > 0 ? "more than" : "less than"}`;
 }
 
-export function Overview({ finance, plans, intel, onOpen }: Props) {
+export function Overview({ finance, plans, planning, intel, onOpen }: Props) {
   const { status, snapshot, transactions, categoriesById, today } = finance;
 
   const view = useMemo(() => {
@@ -53,7 +56,7 @@ export function Overview({ finance, plans, intel, onOpen }: Props) {
     const flowLastToDate = flowForMonth(transactions, categoriesById, lastMonth, day);
     return {
       month,
-      totals: accountTotals(snapshot.accounts),
+      totals: netWorthNow(snapshot.accounts, planning.holdings),
       flow,
       spendingLastToDate: flowLastToDate.spendingCents,
       months: recentMonthKeys(today, 6).map((m) => ({ month: m, ...flowForMonth(transactions, categoriesById, m) })),
@@ -63,7 +66,7 @@ export function Overview({ finance, plans, intel, onOpen }: Props) {
       ),
       accounts: new Map(snapshot.accounts.map((a) => [a.id, a.name])),
     };
-  }, [snapshot, transactions, categoriesById, today]);
+  }, [snapshot, transactions, categoriesById, today, planning.holdings]);
 
   const ahead = useMemo(() => upcoming(plans.recurring, today, 14), [plans.recurring, today]);
   const goalRows = useMemo(
@@ -72,7 +75,7 @@ export function Overview({ finance, plans, intel, onOpen }: Props) {
   );
 
   if (status === "error") return <LoadFailed message={finance.error ?? ""} onRetry={finance.reload} />;
-  if (!view || status === "loading") return <LoadingBlock label="Loading your finances…" />;
+  if (!view || status === "loading" || planning.status === "loading") return <LoadingBlock label="Loading your finances…" />;
 
   const { totals, flow, months, thisMonth } = view;
   const monthName = monthLabel(view.month);
@@ -90,7 +93,12 @@ export function Overview({ finance, plans, intel, onOpen }: Props) {
           <h2 id="nw" className="text-label text-ink-tertiary">
             Net worth
           </h2>
-          <BasisTag basis="calculation" />
+          <div className="flex items-center gap-2">
+            <BasisTag basis="calculation" />
+            <Button variant="tertiary" size="sm" onClick={() => onOpen("net-worth")}>
+              See it over time
+            </Button>
+          </div>
         </div>
         <p className="mt-2 text-display tabular-nums text-ink max-md:text-title">{formatMoney(totals.netWorthCents)}</p>
         <p className="mt-2 text-body text-ink-tertiary">

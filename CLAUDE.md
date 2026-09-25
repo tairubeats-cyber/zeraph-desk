@@ -174,17 +174,37 @@ wording and structure.
   balances have history.
 - **Ask ZeraphDesk is deterministic code, not a model** (`ask.ts`). It answers
   from the data on this computer, shows what it was based on, and says "I can't"
-  rather than guess (for example why net worth moved, with no balance history).
+  rather than guess (it can show which balances moved over a period, never why; with no balance history it says it can't).
   Nothing about a question or the data is sent anywhere. If a model is ever put in
   front of it to understand wording, it must call these same functions and add no
   numbers of its own; whether any data may be sent to one is a separate decision.
+- **Planning (phase 4).** Nothing here is stored except what the person enters
+  (`fin_debt_terms`, `fin_holdings` and their dated values, `fin_planned`,
+  `fin_scenarios`); forecasts, payoff dates and scenario results are recomputed.
+  - *Balance history comes from the provider* (`FinancialSnapshot.balanceHistory`); the
+    sample invents one and says so. Don't rebuild it from transactions (they aren't
+    complete per account) and don't record snapshots until a real provider exists.
+    A gap in the data is filled by one rule (latest on or before, else the first
+    known, else today's) and every fill is reported in `notes`.
+  - *Net worth* counts accounts plus holdings the person added by hand (a home, a car,
+    a family loan). Overview, Accounts, Ask and Net Worth all use `netWorthNow`, so
+    the figure is the same everywhere.
+  - *Debt rates and payments are entered, never guessed* and are labelled "you entered".
+    Payoff dates are estimates (monthly compounding, nothing new charged).
+  - *The forecast* follows checking and cash accounts only: recurring items that leave
+    them, planned items, and an optional steady estimate of everyday spending. Anything
+    charged to a credit card is left out because the card payment already carries it;
+    counting both counts the money twice. It is a projection and says so.
+  - *Scenarios report differences from carrying on*, never a predicted absolute, so they
+    need no forecast of the baseline. Net worth in a scenario is cash + set aside + value
+    of what was bought + reduction in debt, so the parts always sum to the total.
 - **Seeding is idempotent.** Default rows go in with INSERT OR IGNORE behind a
   single shared promise, never "insert if the table is empty"; concurrent loads
   once left categories missing.
-- **Order of work:** phases 1 to 3 done (shell, Overview, Accounts, Transactions; Recurring,
+- **Order of work:** phases 1 to 4 done (shell, Overview, Accounts, Transactions; Recurring,
   Bills, Cash Flow, Budgets, Goals; Action Center, Activity, Ask, notifications,
-  Preferences). Then planning (forecast, scenarios, debt, net-worth history),
-  then wealth, then real provider infrastructure. Don't fake a later phase inside an earlier one.
+  Preferences; Forecast, Scenarios, Debt, Net Worth). Next: wealth (Investments, portfolio
+  analysis, long-term planning), then real provider infrastructure. Don't fake a later phase inside an earlier one.
 
 ## Trades
 

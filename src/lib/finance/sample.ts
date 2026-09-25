@@ -1,5 +1,5 @@
-import type { Connection, FinancialAccount, FinancialSnapshot, Institution, Transaction } from "./types";
-import { recentMonthKeys, toISODate } from "./money";
+import type { BalancePoint, Connection, FinancialAccount, FinancialSnapshot, Institution, Transaction } from "./types";
+import { addDays, recentMonthKeys, toISODate } from "./money";
 
 /**
  * Sample data, so the app is usable before any real provider exists.
@@ -98,6 +98,51 @@ function tidy(cents: number): number {
   return Math.round(cents / 5) * 5;
 }
 
+/** Three years, so the longer Net Worth ranges have something to show. */
+const HISTORY_DAYS = 1095;
+const DAYS_PER_MONTH = 30.4375;
+
+/**
+ * An invented balance history for each account, ending exactly at today's
+ * balance. Each account follows a simple story (a savings account that grew, a
+ * loan that shrank) with some seeded wobble, anchored once a month and joined
+ * by straight lines, so the same day always gives the same figure.
+ */
+function generateBalanceHistory(today: string, accounts: FinancialAccount[]): BalancePoint[] {
+  /** Balance k months ago, in dollars, given a random draw in [0, 1). */
+  const story: Record<string, (k: number, r: number) => number> = {
+    "acct-checking": (_k, r) => 3_000 + r * 2_600,
+    "acct-savings": (k, r) => 12_600 - 320 * k + (r - 0.5) * 120,
+    "acct-brokerage": (k, r) => (28_450 - 480 * k) * (1 + (r - 0.5) * 0.08),
+    "acct-401k": (k, r) => (64_300 - 1_300 * k) * (1 + (r - 0.5) * 0.06),
+    "acct-card": (_k, r) => 600 + r * 1_400,
+    "acct-auto": (k, r) => 12_400 + 290 * k + (r - 0.5) * 10,
+    "acct-student": (k, r) => 18_900 + 200 * k + (r - 0.5) * 10,
+  };
+
+  const points: BalancePoint[] = [];
+  for (const a of accounts) {
+    const shape = story[a.id];
+    if (!shape) continue;
+    const seed = [...a.id].reduce((h, ch) => Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0, 2166136261);
+    const months = Math.ceil(HISTORY_DAYS / DAYS_PER_MONTH) + 2;
+    const anchors = Array.from({ length: months }, (_, k) =>
+      k === 0 ? a.balanceCents : Math.max(0, Math.round(shape(k, rng(seed + k)()) * 100)),
+    );
+    for (let daysAgo = 0; daysAgo <= HISTORY_DAYS; daysAgo++) {
+      const pos = daysAgo / DAYS_PER_MONTH;
+      const k = Math.floor(pos);
+      const t = pos - k;
+      points.push({
+        accountId: a.id,
+        date: addDays(today, -daysAgo),
+        balanceCents: daysAgo === 0 ? a.balanceCents : Math.round(anchors[k] * (1 - t) + anchors[k + 1] * t),
+      });
+    }
+  }
+  return points;
+}
+
 export function generateSample(today: string): FinancialSnapshot {
   const connections: Connection[] = INSTITUTIONS.map((i) => ({
     id: `conn-${i.id}`,
@@ -153,5 +198,5 @@ export function generateSample(today: string): FinancialSnapshot {
   }
 
   transactions.sort((a, b) => (a.date === b.date ? a.id.localeCompare(b.id) : b.date.localeCompare(a.date)));
-  return { institutions: INSTITUTIONS, connections, accounts, transactions };
+  return { institutions: INSTITUTIONS, connections, accounts, transactions, balanceHistory: generateBalanceHistory(today, accounts) };
 }

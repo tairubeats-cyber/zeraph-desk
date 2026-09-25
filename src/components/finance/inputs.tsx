@@ -107,13 +107,13 @@ export function Segmented<T extends string | number>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div role="group" aria-label={label} className="inline-flex gap-1 rounded-control bg-surface-secondary p-1">
+    <div role="group" aria-label={label} className="inline-flex max-w-full flex-wrap gap-1 rounded-control bg-surface-secondary p-1">
       {options.map((o) => (
         <button
           key={String(o.value)}
           onClick={() => onChange(o.value)}
           aria-pressed={o.value === value}
-          className="h-8 rounded-lg px-3 text-label text-ink-secondary transition-colors duration-150 ease-standard aria-pressed:bg-surface aria-pressed:text-ink aria-pressed:shadow-card"
+          className="h-8 whitespace-nowrap rounded-lg px-3 text-label text-ink-secondary transition-colors duration-150 ease-standard aria-pressed:bg-surface aria-pressed:text-ink aria-pressed:shadow-card"
         >
           {o.label}
         </button>

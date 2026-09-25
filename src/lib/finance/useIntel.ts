@@ -15,6 +15,7 @@ import { DEFAULT_PREFS, type DetectorId, type FinancePreferences } from "./prefs
 import type { AskContext } from "./ask";
 import type { Finance } from "./useFinance";
 import type { Plans } from "./usePlans";
+import type { Planning } from "./usePlanning";
 
 function message(err: unknown): string {
   return typeof err === "string" ? err : err instanceof Error ? err.message : "Something went wrong.";
@@ -26,7 +27,7 @@ function message(err: unknown): string {
  * changes; only the person's response to each is stored. Reading and
  * detection never write anything except that state.
  */
-export function useIntel(finance: Finance, plans: Plans, onError: (message: string) => void) {
+export function useIntel(finance: Finance, plans: Plans, planning: Planning, onError: (message: string) => void) {
   const [prefs, setPrefs] = useState<FinancePreferences | null>(null);
   const [states, setStates] = useState<InsightState[] | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
@@ -175,9 +176,13 @@ export function useIntel(finance: Finance, plans: Plans, onError: (message: stri
             budgets: plans.budgets,
             goals: plans.goals,
             contributions: plans.contributions,
+            holdings: planning.holdings,
+            history: finance.snapshot.balanceHistory,
+            debtTerms: planning.debtTerms,
+            planned: planning.planned,
           }
         : null,
-    [finance.snapshot, finance.today, finance.origin, finance.transactions, finance.categories, plans.recurring, plans.budgets, plans.goals, plans.contributions],
+    [finance.snapshot, finance.today, finance.origin, finance.transactions, finance.categories, plans.recurring, plans.budgets, plans.goals, plans.contributions, planning.holdings, planning.debtTerms, planning.planned],
   );
 
   return {
