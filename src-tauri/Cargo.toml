@@ -19,6 +19,11 @@ native-tls = "0.2"
 lettre = { version = "0.11", default-features = false, features = ["smtp-transport", "native-tls", "builder"] }
 mail-parser = "0.9"
 keyring = "3"
+# SimpleFIN: the bridge is called from Rust so its access URL never reaches the webview.
+ureq = { version = "2", default-features = false, features = ["native-tls"] }
+url = "2"
+base64 = "0.22"
+percent-encoding = "2"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
 # keyring 3 has no default credential store: without a platform feature it silently uses an

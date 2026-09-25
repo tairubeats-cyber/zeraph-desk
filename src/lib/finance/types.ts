@@ -446,6 +446,26 @@ export interface ImportedAccount {
   /** The latest balance on record; the size of it, so owed amounts are positive. */
   balanceCents: number;
   createdAt: string;
+  /** null for an account the person added by hand; "simplefin" for one the bridge supplies. */
+  provider: "simplefin" | null;
+  /** The bridge's own id for the account. */
+  externalId: string | null;
+  /** For a debt: whether this bank shows what is owed as a positive number. */
+  owedPositive: boolean;
+}
+
+/** One trip to the bridge, kept so the screen can say what happened and how many requests are left today. */
+export interface SyncRun {
+  id: string;
+  kind: "discover" | "sync";
+  at: string;
+  ok: boolean;
+  /** False when part of the date range couldn't be fetched, so the next sync has to cover it again. */
+  complete: boolean;
+  requests: number;
+  accounts: number;
+  added: number;
+  message: string | null;
 }
 
 export interface ImportRecord {

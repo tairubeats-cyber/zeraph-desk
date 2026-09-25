@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod mail;
+mod simplefin;
 
 use tauri_plugin_sql::{Migration, MigrationKind};
 
@@ -48,6 +49,12 @@ fn main() {
             sql: include_str!("../migrations/007_import.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 8,
+            description: "finance synced accounts and sync history",
+            sql: include_str!("../migrations/008_sync.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
@@ -62,6 +69,10 @@ fn main() {
             mail::mail_is_connected,
             mail::mail_pull,
             mail::mail_send,
+            simplefin::simplefin_claim,
+            simplefin::simplefin_connected,
+            simplefin::simplefin_disconnect,
+            simplefin::simplefin_accounts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Zeraph Desk");

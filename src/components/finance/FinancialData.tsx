@@ -66,7 +66,7 @@ function AddAccountForm({ today, first, onSave, onCancel }: { today: string; fir
     if (balance === null) return setError(owed ? "Enter how much is owed right now (0 if nothing)." : "Enter the balance right now.");
     if (mask && !/^\d{1,4}$/.test(mask)) return setError("The last digits should be up to four numbers.");
     onSave(
-      { id: slugId("srcacct"), name: name.trim(), kind, institution: institution.trim(), mask: mask || null, balanceCents: balance, createdAt: new Date().toISOString() },
+      { id: slugId("srcacct"), name: name.trim(), kind, institution: institution.trim(), mask: mask || null, balanceCents: balance, createdAt: new Date().toISOString(), provider: null, externalId: null, owedPositive: false },
       date || today,
     );
   }
@@ -75,7 +75,7 @@ function AddAccountForm({ today, first, onSave, onCancel }: { today: string; fir
     <form noValidate onSubmit={submit} className="grid gap-3 md:grid-cols-2">
       {first && (
         <p role="note" className="rounded-control bg-warning-soft px-3 py-2 text-body text-ink md:col-span-2">
-          Adding your first account replaces the sample data with your own. You can go back to the sample by removing imported data.
+          Adding your first account replaces the sample data with your own. You can go back to the sample by removing your data.
         </p>
       )}
       <div>
@@ -401,7 +401,7 @@ function ImportWizard({ account, finance, onDone, onCancel }: { account: Importe
 
 type Mode = { kind: "none" } | { kind: "add" } | { kind: "import"; id: string } | { kind: "balance"; id: string } | { kind: "remove"; id: string } | { kind: "clear" };
 
-export function FinancialData({ finance, onNotify }: { finance: Finance; onNotify: (message: string) => void }) {
+export function FinancialData({ finance, onNotify, tick = 0 }: { finance: Finance; onNotify: (message: string) => void; tick?: number }) {
   const today = toISODate(new Date());
   const [accounts, setAccounts] = useState<ImportedAccount[] | null>(null);
   const [balances, setBalances] = useState<BalancePoint[]>([]);
@@ -416,9 +416,10 @@ export function FinancialData({ finance, onNotify }: { finance: Finance; onNotif
     setBalances(b);
   }, []);
 
+  // `tick` changes when something outside this section (a sync) has changed the accounts.
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, tick]);
 
   async function refresh() {
     await load();
@@ -468,7 +469,7 @@ export function FinancialData({ finance, onNotify }: { finance: Finance; onNotif
     setMode({ kind: "none" });
     setResult(null);
     await refresh();
-    onNotify("Imported data removed. Showing the sample again.");
+    onNotify("Your data was removed. Showing the sample again.");
   }
 
   const list = accounts ?? [];
@@ -480,20 +481,20 @@ export function FinancialData({ finance, onNotify }: { finance: Finance; onNotif
         <p className="max-w-[62ch] text-body text-ink-secondary">
           {sample ? (
             <>
-              <span className="font-medium text-ink">You're looking at sample data.</span> ZeraphDesk can't connect to a bank. To use your own numbers, add an account and
-              import the CSV file your bank lets you download. The file is read on this computer and isn't uploaded anywhere.
+              <span className="font-medium text-ink">You're looking at sample data.</span> To use your own numbers, link your accounts with SimpleFIN above, or add an account
+              here and import the CSV file your bank lets you download. A file is read on this computer and isn't uploaded anywhere.
             </>
           ) : (
             <>
-              <span className="font-medium text-ink">You're looking at data you imported.</span> Balances are what you entered or what the file's balance column said,
-              and nothing updates until you import again. ZeraphDesk can't connect to a bank.
+              <span className="font-medium text-ink">You're looking at your own accounts.</span> Accounts linked through SimpleFIN update when you sync. Accounts you added here
+              have the balance you entered, or the file's balance column, and change only when you update them or import again.
             </>
           )}
         </p>
         {mode.kind !== "add" && (
           <Button variant={sample ? "primary" : "secondary"} className="mt-4" onClick={() => setMode({ kind: "add" })}>
             <Plus className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-            Add an account
+            Add an account by hand
           </Button>
         )}
         {mode.kind === "add" && (
@@ -527,7 +528,8 @@ export function FinancialData({ finance, onNotify }: { finance: Finance; onNotif
                       <p className="truncate text-body font-medium text-ink">{a.name}</p>
                       <p className="text-label font-normal text-ink-tertiary">
                         {a.institution} · {ACCOUNT_KINDS[a.kind].label}
-                        {a.mask ? ` ••${a.mask}` : ""} · {counts.get(a.id) ?? 0} {(counts.get(a.id) ?? 0) === 1 ? "transaction" : "transactions"}
+                        {a.mask ? ` ••${a.mask}` : ""}
+                        {a.provider === "simplefin" ? " · linked with SimpleFIN" : ""} · {counts.get(a.id) ?? 0} {(counts.get(a.id) ?? 0) === 1 ? "transaction" : "transactions"}
                       </p>
                     </div>
                     <div className="text-right">
@@ -569,7 +571,7 @@ export function FinancialData({ finance, onNotify }: { finance: Finance; onNotif
                     </form>
                   ) : mode.kind === "remove" && mode.id === a.id ? (
                     <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
-                      <span className="mr-1 text-label text-ink-secondary">Remove this account and everything imported into it?</span>
+                      <span className="mr-1 text-label text-ink-secondary">Remove this account and everything imported or synced into it?</span>
                       <Button variant="tertiary" size="sm" onClick={() => setMode({ kind: "none" })}>
                         Keep it
                       </Button>
@@ -579,14 +581,18 @@ export function FinancialData({ finance, onNotify }: { finance: Finance; onNotif
                     </div>
                   ) : (
                     <div className="mt-4 flex flex-wrap items-center justify-end gap-1 border-t border-line pt-3">
-                      <Button variant="secondary" size="sm" onClick={() => { setResult(null); setMode({ kind: "import", id: a.id }); }}>
-                        <FileUp className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-                        <span className="sr-only">Import transactions into {a.name}: </span>
-                        Import transactions
-                      </Button>
-                      <Button variant="tertiary" size="sm" aria-label={`Update the balance of ${a.name}`} onClick={() => { setBalanceValue(null); setBalanceDate(today); setMode({ kind: "balance", id: a.id }); }}>
-                        Update balance
-                      </Button>
+                      {a.provider !== "simplefin" && (
+                        <>
+                          <Button variant="secondary" size="sm" onClick={() => { setResult(null); setMode({ kind: "import", id: a.id }); }}>
+                            <FileUp className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+                            <span className="sr-only">Import transactions into {a.name}: </span>
+                            Import transactions
+                          </Button>
+                          <Button variant="tertiary" size="sm" aria-label={`Update the balance of ${a.name}`} onClick={() => { setBalanceValue(null); setBalanceDate(today); setMode({ kind: "balance", id: a.id }); }}>
+                            Update balance
+                          </Button>
+                        </>
+                      )}
                       <Button variant="tertiary" size="sm" aria-label={`Remove ${a.name}`} onClick={() => setMode({ kind: "remove", id: a.id })}>
                         Remove
                       </Button>
@@ -615,17 +621,17 @@ export function FinancialData({ finance, onNotify }: { finance: Finance; onNotif
         <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
           {mode.kind === "clear" ? (
             <>
-              <span className="mr-1 text-label text-ink-secondary">Remove every imported account, transaction and balance, and go back to the sample?</span>
+              <span className="mr-1 text-label text-ink-secondary">Remove every account, transaction and balance you added, imported or synced, and go back to the sample? A SimpleFIN connection stays until you disconnect it.</span>
               <Button variant="tertiary" size="sm" onClick={() => setMode({ kind: "none" })}>
                 Keep them
               </Button>
               <Button variant="secondary" size="sm" className="text-danger" onClick={() => void clearAll()}>
-                Remove imported data
+                Remove my data
               </Button>
             </>
           ) : (
             <Button variant="tertiary" size="sm" onClick={() => setMode({ kind: "clear" })}>
-              Remove all imported data
+              Remove all my data
             </Button>
           )}
         </div>

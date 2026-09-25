@@ -29,6 +29,7 @@ import type {
   HoldingKind,
   ImportRecord,
   ImportedAccount,
+  SyncRun,
   LongTermAssumptions,
   ManualRecurring,
   Necessity,
@@ -887,7 +888,18 @@ export const db = {
   async srcAccounts(): Promise<ImportedAccount[]> {
     const handle = await open();
     const rows = await handle.select<
-      { id: string; name: string; kind: string; institution: string; mask: string | null; balance_cents: number; created_at: string }[]
+      {
+        id: string;
+        name: string;
+        kind: string;
+        institution: string;
+        mask: string | null;
+        balance_cents: number;
+        created_at: string;
+        provider: string | null;
+        external_id: string | null;
+        owed_positive: number;
+      }[]
     >("SELECT * FROM fin_src_accounts ORDER BY created_at ASC");
     return rows.map((r) => ({
       id: r.id,
@@ -897,16 +909,20 @@ export const db = {
       mask: r.mask,
       balanceCents: r.balance_cents,
       createdAt: r.created_at,
+      provider: r.provider === "simplefin" ? "simplefin" : null,
+      externalId: r.external_id,
+      owedPositive: r.owed_positive === 1,
     }));
   },
 
   async saveSrcAccount(a: ImportedAccount): Promise<void> {
     const handle = await open();
     await handle.execute(
-      `INSERT INTO fin_src_accounts (id, name, kind, institution, mask, balance_cents, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO fin_src_accounts (id, name, kind, institution, mask, balance_cents, created_at, provider, external_id, owed_positive)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        ON CONFLICT(id) DO UPDATE SET name = excluded.name, kind = excluded.kind, institution = excluded.institution,
          mask = excluded.mask, balance_cents = excluded.balance_cents`,
-      [a.id, a.name, a.kind, a.institution, a.mask, a.balanceCents, a.createdAt],
+      [a.id, a.name, a.kind, a.institution, a.mask, a.balanceCents, a.createdAt, a.provider, a.externalId, a.owedPositive ? 1 : 0],
     );
   },
 
@@ -1000,10 +1016,37 @@ export const db = {
     return rows.map((r) => ({ id: r.id, accountId: r.account_id, at: r.at, fileName: r.file_name, rowsTotal: r.rows_total, added: r.added, skipped: r.skipped, invalid: r.invalid }));
   },
 
-  /** Empties everything that was imported. The app goes back to showing the sample. */
+  async logSyncRun(r: SyncRun): Promise<void> {
+    const handle = await open();
+    await handle.execute(
+      "INSERT INTO fin_sync_runs (id, provider, kind, at, ok, complete, requests, accounts, added, message) VALUES ($1, 'simplefin', $2, $3, $4, $5, $6, $7, $8, $9)",
+      [r.id, r.kind, r.at, r.ok ? 1 : 0, r.complete ? 1 : 0, r.requests, r.accounts, r.added, r.message],
+    );
+  },
+
+  /** Newest first. */
+  async syncRuns(): Promise<SyncRun[]> {
+    const handle = await open();
+    const rows = await handle.select<
+      { id: string; kind: string; at: string; ok: number; complete: number; requests: number; accounts: number; added: number; message: string | null }[]
+    >("SELECT * FROM fin_sync_runs ORDER BY at DESC");
+    return rows.map((r) => ({
+      id: r.id,
+      kind: r.kind === "discover" ? "discover" : "sync",
+      at: r.at,
+      ok: r.ok === 1,
+      complete: r.complete === 1,
+      requests: r.requests,
+      accounts: r.accounts,
+      added: r.added,
+      message: r.message,
+    }));
+  },
+
+  /** Empties everything that was imported or synced. The app goes back to showing the sample. */
   async clearSrc(): Promise<void> {
     const handle = await open();
-    for (const table of ["fin_src_transactions", "fin_src_balances", "fin_src_imports", "fin_src_accounts"]) {
+    for (const table of ["fin_src_transactions", "fin_src_balances", "fin_src_imports", "fin_src_accounts", "fin_sync_runs"]) {
       await handle.execute(`DELETE FROM ${table}`);
     }
   },

@@ -138,8 +138,8 @@ export function Accounts({ finance, planning }: { finance: Finance; planning: Pl
         <h2 className="text-heading text-ink">{finance.source === "import" ? "Where these came from" : "Using your own accounts"}</h2>
         <p className="mt-2 max-w-[62ch] text-body text-ink-secondary">
           {finance.source === "import"
-            ? "You added these accounts and imported their transactions from files. ZeraphDesk can't connect to a bank, so balances change only when you update them or import again. You can do both under Connections."
-            : "ZeraphDesk can't connect to a bank yet, so nothing on this screen came from a real institution. To use your own numbers, add an account and import the file your bank lets you download, under Connections."}
+            ? "These are accounts you added yourself, imported from files, or linked with SimpleFIN. A linked account updates when you press Sync; the others change when you update or import them. All of that is under Connections."
+            : "Nothing on this screen came from a real institution. To use your own numbers, link your accounts with SimpleFIN or import a file your bank lets you download, under Connections."}
         </p>
       </Card>
     </div>

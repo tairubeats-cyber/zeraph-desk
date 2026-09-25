@@ -29,7 +29,11 @@ export type EventKind =
   | "scenario_saved"
   | "long_term_changed"
   | "data_imported"
-  | "system_notifications_changed";
+  | "system_notifications_changed"
+  | "simplefin_connected"
+  | "simplefin_disconnected"
+  | "account_synced_added"
+  | "account_synced";
 
 export interface Event {
   id: ID;

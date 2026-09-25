@@ -120,10 +120,11 @@ wording and structure.
 - **Provider seam.** Everything reads a `FinancialSnapshot` from `activeProvider`
   (`providers.ts`). A real aggregator, CSV import or manual entry implements
   `FinancialDataProvider` and replaces that one line. No view knows the source.
-- **Never fake a connection.** Today's provider is `sample`: invented, generated
+- **Never fake a connection.** The default provider is `sample`: invented, generated
   deterministically, and labelled "Sample data" on every finance screen and every
-  account. Don't add a "Connect" button until a provider really exists, and don't
-  claim bank-level security, certifications, regulation or advisor status.
+  account. An account is only called "Connected" when a SimpleFIN access key is really
+  saved and the last sync worked; imported files are "Imported", never a connection.
+  Don't claim bank-level security, certifications, regulation or advisor status.
 - **Stored vs. provided.** SQLite holds the user's own choices (`fin_categories`,
   `fin_tx_overrides`, and so on). The sample provider's accounts and transactions are
   never copied into it. The one exception is data the person imports themselves: it lives
@@ -141,9 +142,9 @@ wording and structure.
   than at this point last month", not "you overspent".
 - **Comparing months:** compare the same stretch (through today's day of month),
   never a partial month against a full one.
-- **Nothing here touches the network yet.** When Intelligence (AI over the user's
-  data) is built it goes through the proxy like drafts do, and what's sent needs
-  a decision first: the desk rule is "only what the answer needs".
+- **The one finance network call is a SimpleFIN sync the person asked for** (below). When
+  Intelligence (AI over the user's data) is built it goes through the proxy like drafts do,
+  and what's sent needs a decision first: the desk rule is "only what the answer needs".
 - **Navigation is one file, `src/nav.ts`.** The sidebar, phone tab bar, section
   tabs, "All sections" page and the view switch in `App.tsx` all read it. The tree
   is Overview; Money (Accounts, Transactions, Cash Flow, Bills, Recurring); Planning
@@ -236,17 +237,38 @@ wording and structure.
     on, only for findings in categories they left on, once each (`os_notified`), rolled up
     past three. Turning them on doesn't announce what's already there. They show while the
     app is open; there is no background service. They carry the finding's title and summary.
-  - *Not built, on purpose:* syncing with a bank through an aggregator, and background jobs
-    that need one. Both wait on choosing a provider and where its access tokens live, which
-    also changes what the Security screen may claim. Don't fake either.
+  - *SimpleFIN Bridge* (`simplefin.rs`, `simplefin.ts`, `syncSimplefin.ts`) is the one aggregator. The person
+    links their bank at the bridge and pastes the one-time setup token; Rust trades it for an
+    access URL and keeps that in the OS keychain (same rule as the mail password: never returned to the
+    webview, never in SQLite, never logged, never in an error message, and requests carry it in a
+    header, not the URL). Only Rust talks to the bridge, so the webview's CSP stays closed to it.
+    - *Sync is a click, never automatic.* No timer, no background job, nothing on launch.
+      A sync makes up to 4 requests (45-day windows, about six months back the first time; later ones
+      start 14 days before the last *complete* sync). The bridge allows about 24 a day, so ZeraphDesk stops
+      at 20 in any 24 hours (`fin_sync_runs`).
+    - *Pending lines are never stored.* Ids are a hash of the bridge's account and line ids, so a line
+      syncs once however often it's fetched; a repeated id inside one account is told apart by order.
+    - *The bridge doesn't say what an account is,* so the kind is a guess from its name that the person
+      confirms before anything is saved; a debt read as an asset would corrupt net worth. Whether the bank
+      shows debt as negative or positive is also chosen (`owed_positive`). Only US dollars: other currencies
+      are listed but can't be added, because converting would be a guess.
+    - *A partial sync* (older windows failed) keeps what arrived, is marked incomplete, and the next sync covers the
+      gap again. Bridge messages are shown in the bridge's words and mark the connection "Needs attention".
+    - *Balance history starts at the first sync* (a snapshot per sync); it isn't reconstructed.
+    - *Not built:* automatic or background sync, Plaid, and the bridge's `holdings` (positions), so linked
+      investment accounts still show a balance and nothing finer. Say "not built" rather than fake it.
+    - *Security wording* (`Security` in Settings) must keep saying what leaves this computer: a read-only key and
+      a date range go to the bridge, balances and transactions come straight back, and SimpleFIN knows which
+      accounts were linked.
 - **Seeding is idempotent.** Default rows go in with INSERT OR IGNORE behind a
   single shared promise, never "insert if the table is empty"; concurrent loads
   once left categories missing.
 - **Order of work:** phases 1 to 5 done (shell, Overview, Accounts, Transactions; Recurring,
   Bills, Cash Flow, Budgets, Goals; Action Center, Activity, Ask, notifications,
   Preferences; Forecast, Scenarios, Debt, Net Worth; Investments with portfolio analysis
-  and the long-term plan). Phase 6 is partly done: file import, balance snapshots and system
-  notifications. Aggregator sync and background jobs wait on a provider decision. Don't fake a later phase inside an earlier one.
+  and the long-term plan). Phase 6 is done except automatic sync: file import, SimpleFIN sync,
+  balance snapshots and system notifications. Background or scheduled sync, and holdings from the bridge, are not built.
+  Don't fake a later phase inside an earlier one.
 
 ## Trades
 
