@@ -14,7 +14,11 @@ export type EventKind =
   | "action_sent"
   | "action_failed"
   | "document_indexed"
-  | "transaction_recategorized";
+  | "transaction_recategorized"
+  | "budget_changed"
+  | "goal_created"
+  | "goal_contribution_added"
+  | "recurring_marked";
 
 export interface Event {
   id: ID;

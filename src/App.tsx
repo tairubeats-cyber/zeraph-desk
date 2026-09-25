@@ -7,6 +7,11 @@ import { ComingSoon } from "./views/ComingSoon";
 import { Overview } from "./views/Overview";
 import { Transactions } from "./views/Transactions";
 import { Accounts } from "./views/Accounts";
+import { CashFlow } from "./views/CashFlow";
+import { Bills } from "./views/Bills";
+import { Recurring } from "./views/Recurring";
+import { Budgets } from "./views/Budgets";
+import { Goals } from "./views/Goals";
 import { Queue } from "./views/Queue";
 import { History } from "./views/History";
 import { Facts } from "./views/Facts";
@@ -17,6 +22,7 @@ import { type BusinessFacts, EMPTY_FACTS } from "./lib/facts";
 import { emailConnector } from "./connectors/email";
 import { syncInbox, proposeFollowUps } from "./lib/sync";
 import { useFinance } from "./lib/finance/useFinance";
+import { usePlans } from "./lib/finance/usePlans";
 import type { TxFilters } from "./lib/finance/filters";
 
 const SYNC_INTERVAL_MS = 60_000;
@@ -39,6 +45,7 @@ export default function App() {
   }, []);
 
   const finance = useFinance(flash);
+  const plans = usePlans(finance, flash);
 
   const current = findItem(view);
 
@@ -46,11 +53,21 @@ export default function App() {
     if (!current.item.built) return <ComingSoon item={current.item} onOverview={() => open("overview")} />;
     switch (view) {
       case "overview":
-        return <Overview finance={finance} onOpen={open} />;
+        return <Overview finance={finance} plans={plans} onOpen={open} />;
       case "accounts":
         return <Accounts finance={finance} />;
       case "transactions":
         return <Transactions finance={finance} preset={txPreset} />;
+      case "cash-flow":
+        return <CashFlow finance={finance} plans={plans} onOpen={open} />;
+      case "bills":
+        return <Bills finance={finance} plans={plans} />;
+      case "recurring":
+        return <Recurring finance={finance} plans={plans} />;
+      case "budgets":
+        return <Budgets finance={finance} plans={plans} />;
+      case "goals":
+        return <Goals finance={finance} plans={plans} />;
       case "queue":
         return <Queue actions={pending} onApprove={approve} onDecline={decline} />;
       case "history":

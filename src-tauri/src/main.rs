@@ -24,6 +24,12 @@ fn main() {
             sql: include_str!("../migrations/003_finance.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 4,
+            description: "finance budgets, goals and recurring marks",
+            sql: include_str!("../migrations/004_money_management.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

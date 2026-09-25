@@ -147,11 +147,23 @@ wording and structure.
   Settings (Profile, Connections, Security, Preferences). Unbuilt sections stay
   listed with `built: false` and open a plain "not built yet" page. Building one
   means flipping that flag, adding its case in `App.tsx`, and nothing else.
-- **Order of work:** phase 1 done (shell, Overview, Accounts, Transactions).
-  Then money management (budgets, bills, recurring, cash flow, goals), then
-  intelligence (action center, activity, notifications, ask-your-data), then
-  planning (forecast, scenarios, debt, net-worth history), then wealth, then
-  real provider infrastructure. Don't fake a later phase inside an earlier one.
+- **Recurring payments are computed, not stored.** `recurring.ts` finds them in
+  the transactions each time (three or more payments on a steady rhythm, steady
+  or moderately varying amounts). Only the user's marks (`fin_recurring_marks`)
+  and payments they add by hand are stored. Marking one cancelled changes how
+  ZeraphDesk counts it and never claims to cancel anything with the merchant.
+  Future dates are expectations from a pattern, labelled as projections.
+- **Budgets and goals:** projected month-end spend is actual so far, plus
+  recurring payments still expected, plus the daily pace of everything else
+  (`budget.ts`). Goal progress is what the user records (start amount plus
+  contributions); it is not read from an account until a provider exists.
+- **The event log holds ids and kinds only.** Amounts, names and merchants stay
+  out of it; a recurring payment is logged by a one-way fingerprint of its key.
+- **Order of work:** phases 1 and 2 done (shell, Overview, Accounts,
+  Transactions; Recurring, Bills, Cash Flow, Budgets, Goals). Then intelligence
+  (action center, activity, notifications, ask-your-data), then planning
+  (forecast, scenarios, debt, net-worth history), then wealth, then real
+  provider infrastructure. Don't fake a later phase inside an earlier one.
 
 ## Trades
 

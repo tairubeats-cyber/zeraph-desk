@@ -10,7 +10,21 @@ import type { Action, ActionKind, ActionPayload, ActionStatus } from "./actions"
 import type { Contact, Thread, Channel, Message } from "./types";
 import { type BusinessFacts, EMPTY_FACTS } from "./facts";
 import { type Event, type EventKind, newEvent } from "./events";
-import type { Category, CategoryKind, TransactionOverride } from "./finance/types";
+import type {
+  Autopay,
+  Budget,
+  Category,
+  CategoryKind,
+  Frequency,
+  Goal,
+  GoalContribution,
+  GoalKind,
+  ManualRecurring,
+  Necessity,
+  RecurringMark,
+  RecurringStatus,
+  TransactionOverride,
+} from "./finance/types";
 import { DEFAULT_CATEGORIES } from "./finance/categories";
 import { FIXTURE_ACTIONS, FIXTURE_CONTACTS, FIXTURE_THREADS } from "./fixtures";
 
@@ -505,6 +519,160 @@ export const db = {
          flagged = excluded.flagged, updated_at = excluded.updated_at`,
       [o.txId, o.categoryId, o.note, o.flagged ? 1 : 0, new Date().toISOString()],
     );
+  },
+
+  // --- Finance phase 2: budgets, goals, recurring marks. Again only the user's own choices. ---
+
+  async budgets(): Promise<Budget[]> {
+    const handle = await open();
+    const rows = await handle.select<{ category_id: string; amount_cents: number }[]>(
+      "SELECT category_id, amount_cents FROM fin_budgets",
+    );
+    return rows.map((r) => ({ categoryId: r.category_id, amountCents: r.amount_cents }));
+  },
+
+  async saveBudget(categoryId: string, amountCents: number): Promise<void> {
+    const handle = await open();
+    await handle.execute(
+      `INSERT INTO fin_budgets (category_id, amount_cents, updated_at) VALUES ($1, $2, $3)
+       ON CONFLICT(category_id) DO UPDATE SET amount_cents = excluded.amount_cents, updated_at = excluded.updated_at`,
+      [categoryId, amountCents, new Date().toISOString()],
+    );
+  },
+
+  async deleteBudget(categoryId: string): Promise<void> {
+    const handle = await open();
+    await handle.execute("DELETE FROM fin_budgets WHERE category_id = $1", [categoryId]);
+  },
+
+  async goals(): Promise<Goal[]> {
+    const handle = await open();
+    const rows = await handle.select<
+      {
+        id: string;
+        name: string;
+        kind: string;
+        target_cents: number;
+        start_cents: number;
+        deadline: string | null;
+        monthly_plan_cents: number;
+        created_at: string;
+      }[]
+    >("SELECT * FROM fin_goals ORDER BY created_at ASC");
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      kind: r.kind as GoalKind,
+      targetCents: r.target_cents,
+      startCents: r.start_cents,
+      deadline: r.deadline,
+      monthlyPlanCents: r.monthly_plan_cents,
+      createdAt: r.created_at,
+    }));
+  },
+
+  async saveGoal(g: Goal): Promise<void> {
+    const handle = await open();
+    await handle.execute(
+      `INSERT INTO fin_goals (id, name, kind, target_cents, start_cents, deadline, monthly_plan_cents, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT(id) DO UPDATE SET name = excluded.name, kind = excluded.kind, target_cents = excluded.target_cents,
+         start_cents = excluded.start_cents, deadline = excluded.deadline, monthly_plan_cents = excluded.monthly_plan_cents`,
+      [g.id, g.name, g.kind, g.targetCents, g.startCents, g.deadline, g.monthlyPlanCents, g.createdAt],
+    );
+  },
+
+  async deleteGoal(id: string): Promise<void> {
+    const handle = await open();
+    await handle.execute("DELETE FROM fin_goal_contributions WHERE goal_id = $1", [id]);
+    await handle.execute("DELETE FROM fin_goals WHERE id = $1", [id]);
+  },
+
+  async goalContributions(): Promise<GoalContribution[]> {
+    const handle = await open();
+    const rows = await handle.select<
+      { id: string; goal_id: string; amount_cents: number; date: string; note: string }[]
+    >("SELECT * FROM fin_goal_contributions ORDER BY date DESC");
+    return rows.map((r) => ({ id: r.id, goalId: r.goal_id, amountCents: r.amount_cents, date: r.date, note: r.note }));
+  },
+
+  async addGoalContribution(c: GoalContribution): Promise<void> {
+    const handle = await open();
+    await handle.execute(
+      "INSERT INTO fin_goal_contributions (id, goal_id, amount_cents, date, note) VALUES ($1, $2, $3, $4, $5)",
+      [c.id, c.goalId, c.amountCents, c.date, c.note],
+    );
+  },
+
+  async deleteGoalContribution(id: string): Promise<void> {
+    const handle = await open();
+    await handle.execute("DELETE FROM fin_goal_contributions WHERE id = $1", [id]);
+  },
+
+  async recurringMarks(): Promise<RecurringMark[]> {
+    const handle = await open();
+    const rows = await handle.select<
+      { key: string; status: string; necessity: string; autopay: string; is_bill: number | null }[]
+    >("SELECT * FROM fin_recurring_marks");
+    return rows.map((r) => ({
+      key: r.key,
+      status: r.status as RecurringStatus,
+      necessity: r.necessity as Necessity,
+      autopay: r.autopay as Autopay,
+      isBill: r.is_bill === null ? null : r.is_bill === 1,
+    }));
+  },
+
+  async saveRecurringMark(m: RecurringMark): Promise<void> {
+    const handle = await open();
+    await handle.execute(
+      `INSERT INTO fin_recurring_marks (key, status, necessity, autopay, is_bill) VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT(key) DO UPDATE SET status = excluded.status, necessity = excluded.necessity,
+         autopay = excluded.autopay, is_bill = excluded.is_bill`,
+      [m.key, m.status, m.necessity, m.autopay, m.isBill === null ? null : m.isBill ? 1 : 0],
+    );
+  },
+
+  async manualRecurring(): Promise<ManualRecurring[]> {
+    const handle = await open();
+    const rows = await handle.select<
+      {
+        id: string;
+        name: string;
+        amount_cents: number;
+        direction: string;
+        frequency: string;
+        next_date: string;
+        category_id: string;
+      }[]
+    >("SELECT * FROM fin_recurring_manual");
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      amountCents: r.amount_cents,
+      direction: r.direction as ManualRecurring["direction"],
+      frequency: r.frequency as Frequency,
+      nextDate: r.next_date,
+      categoryId: r.category_id,
+    }));
+  },
+
+  async saveManualRecurring(m: ManualRecurring): Promise<void> {
+    const handle = await open();
+    await handle.execute(
+      `INSERT INTO fin_recurring_manual (id, name, amount_cents, direction, frequency, next_date, category_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT(id) DO UPDATE SET name = excluded.name, amount_cents = excluded.amount_cents,
+         direction = excluded.direction, frequency = excluded.frequency, next_date = excluded.next_date,
+         category_id = excluded.category_id`,
+      [m.id, m.name, m.amountCents, m.direction, m.frequency, m.nextDate, m.categoryId],
+    );
+  },
+
+  async deleteManualRecurring(id: string): Promise<void> {
+    const handle = await open();
+    await handle.execute("DELETE FROM fin_recurring_manual WHERE id = $1", [id]);
+    await handle.execute("DELETE FROM fin_recurring_marks WHERE key = $1", [`manual:${id}`]);
   },
 
   async log(...entries: Event[]): Promise<void> {

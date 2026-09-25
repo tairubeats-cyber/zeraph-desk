@@ -149,3 +149,116 @@ export interface FinancialDataProvider {
  * reported is not the same thing as a sum we computed or a forecast we assumed.
  */
 export type Basis = "fact" | "calculation" | "projection" | "insight" | "scenario";
+
+// --- Phase 2: money management -------------------------------------------------
+
+export type Frequency = "weekly" | "biweekly" | "semimonthly" | "monthly" | "quarterly" | "yearly";
+export type RecurringStatus = "active" | "reviewing" | "cancelled";
+export type Necessity = "unset" | "essential" | "non_essential";
+export type Autopay = "unset" | "on" | "off";
+
+/** What the user has said about one recurring payment. Detection never overwrites this. */
+export interface RecurringMark {
+  key: string;
+  status: RecurringStatus;
+  necessity: Necessity;
+  autopay: Autopay;
+  /** null = use the default guess from the category. */
+  isBill: boolean | null;
+}
+
+/** A recurring payment the user added themselves (rent that predates the history, a new subscription). */
+export interface ManualRecurring {
+  id: string;
+  name: string;
+  /** Always positive; `direction` says which way the money moves. */
+  amountCents: number;
+  direction: "in" | "out";
+  frequency: Frequency;
+  nextDate: string;
+  categoryId: string;
+}
+
+export interface RecurringPayment {
+  /** Stable across launches: the mark and any manual entry hang off it. */
+  key: string;
+  source: "detected" | "manual";
+  merchant: string;
+  categoryId: string;
+  direction: "in" | "out";
+  /** The category's kind, so callers can tell spending from transfers from income. */
+  kind: CategoryKind;
+  frequency: Frequency;
+  /** Most recent amount, as a positive number. */
+  amountCents: number;
+  /** Average amount over the history, as a positive number. */
+  typicalCents: number;
+  /** True when the amount moves around (utilities), so the figure is an estimate. */
+  variable: boolean;
+  annualCents: number;
+  lastDate: string | null;
+  /** The next date the pattern says to expect it; may already be past if it hasn't shown up. */
+  nextDate: string;
+  occurrences: number;
+  /** No charge for well over one cycle: it may have stopped. Shown as a note, never acted on. */
+  possiblyStopped: boolean;
+  /** Days of the month for `semimonthly`, e.g. [1, 15]. */
+  monthDays: number[];
+  /** Transactions the pattern was built from, newest first. */
+  txIds: string[];
+  status: RecurringStatus;
+  necessity: Necessity;
+  autopay: Autopay;
+  isBill: boolean;
+}
+
+export interface Budget {
+  categoryId: string;
+  /** Per month. */
+  amountCents: number;
+}
+
+export type GoalKind =
+  | "emergency_fund"
+  | "new_car"
+  | "house"
+  | "vacation"
+  | "debt_payoff"
+  | "retirement"
+  | "investment"
+  | "large_purchase"
+  | "custom";
+
+export const GOAL_KINDS: Record<GoalKind, string> = {
+  emergency_fund: "Emergency fund",
+  new_car: "New car",
+  house: "House",
+  vacation: "Vacation",
+  debt_payoff: "Debt payoff",
+  retirement: "Retirement",
+  investment: "Investment target",
+  large_purchase: "Large purchase",
+  custom: "Custom goal",
+};
+
+export interface Goal {
+  id: string;
+  name: string;
+  kind: GoalKind;
+  targetCents: number;
+  /** What was already set aside when the goal was created. */
+  startCents: number;
+  /** Optional finish line, YYYY-MM-DD. */
+  deadline: string | null;
+  /** What the person intends to put in each month; 0 if they haven't decided. */
+  monthlyPlanCents: number;
+  createdAt: string;
+}
+
+export interface GoalContribution {
+  id: string;
+  goalId: string;
+  amountCents: number;
+  date: string;
+  note: string;
+}

@@ -53,6 +53,22 @@ export function useFinance(onError: (message: string) => void) {
     void load();
   }, [load]);
 
+  // "Today" is fixed when the data loads, so an app left open overnight would keep
+  // showing yesterday's bills and budgets. Reload when the calendar day changes.
+  const loadedDay = loaded?.today;
+  useEffect(() => {
+    if (!loadedDay) return;
+    const check = () => {
+      if (toISODate(new Date()) !== loadedDay) void load();
+    };
+    const timer = setInterval(check, 60_000);
+    window.addEventListener("focus", check);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", check);
+    };
+  }, [loadedDay, load]);
+
   const guarded = useCallback(
     async (write: () => Promise<void>) => {
       try {

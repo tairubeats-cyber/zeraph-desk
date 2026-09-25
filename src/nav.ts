@@ -115,9 +115,9 @@ export const GROUPS: NavGroup[] = [
     items: [
       { key: "accounts", label: "Accounts", icon: Wallet, built: true, phase: 1, about: "Every account you own or owe on, by kind." },
       { key: "transactions", label: "Transactions", icon: ReceiptText, built: true, phase: 1, about: "Search, sort and categorise what came in and went out." },
-      { key: "cash-flow", label: "Cash Flow", icon: ArrowDownUp, built: false, phase: 2, about: "Income against spending over time, and the recurring payments that shape it." },
-      { key: "bills", label: "Bills", icon: CalendarDays, built: false, phase: 2, about: "Upcoming bills on a calendar, with due dates, paid status and autopay." },
-      { key: "recurring", label: "Recurring", icon: Repeat, built: false, phase: 2, about: "Subscriptions and repeating payments found in your transactions, with what each costs a year." },
+      { key: "cash-flow", label: "Cash Flow", icon: ArrowDownUp, built: true, phase: 2, about: "Income against spending over time, and the recurring payments that shape it." },
+      { key: "bills", label: "Bills", icon: CalendarDays, built: true, phase: 2, about: "Upcoming bills on a calendar, with due dates, paid status and autopay." },
+      { key: "recurring", label: "Recurring", icon: Repeat, built: true, phase: 2, about: "Subscriptions and repeating payments found in your transactions, with what each costs a year." },
     ],
   },
   {
@@ -125,8 +125,8 @@ export const GROUPS: NavGroup[] = [
     label: "Planning",
     icon: Target,
     items: [
-      { key: "budgets", label: "Budgets", icon: ChartPie, built: false, phase: 2, about: "Monthly and category budgets: budget, actual, remaining and projected." },
-      { key: "goals", label: "Goals", icon: Target, built: false, phase: 2, about: "Savings and payoff goals, with progress and the monthly amount each one needs." },
+      { key: "budgets", label: "Budgets", icon: ChartPie, built: true, phase: 2, about: "Monthly and category budgets: budget, actual, remaining and projected." },
+      { key: "goals", label: "Goals", icon: Target, built: true, phase: 2, about: "Savings and payoff goals, with progress and the monthly amount each one needs." },
       { key: "forecast", label: "Forecast", icon: ChartLine, built: false, phase: 4, about: "A projection of your balance from known income, bills and payments. A projection, never a promise." },
       { key: "scenarios", label: "Scenarios", icon: SlidersHorizontal, built: false, phase: 4, about: "What-if planning: see how a change could move your cash flow, goals and net worth." },
     ],

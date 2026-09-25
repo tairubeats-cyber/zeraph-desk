@@ -12,13 +12,18 @@ import {
   TransactionRow,
 } from "@/components/finance/parts";
 import type { Finance } from "@/lib/finance/useFinance";
+import type { Plans } from "@/lib/finance/usePlans";
+import { ProgressBar } from "@/components/finance/inputs";
+import { upcoming } from "@/lib/finance/cashflow";
+import { goalProgress } from "@/lib/finance/goals";
 import { accountTotals, flowForMonth, spendingByCategory } from "@/lib/finance/analysis";
-import { dayOfMonth, formatMoney, monthKey, monthLabel, recentMonthKeys, shiftMonth } from "@/lib/finance/money";
+import { dayOfMonth, formatMoney, monthKey, monthLabel, parseISODate, recentMonthKeys, shiftMonth } from "@/lib/finance/money";
 import type { TxFilters } from "@/lib/finance/filters";
 import type { ViewKey } from "@/nav";
 
 interface Props {
   finance: Finance;
+  plans: Plans;
   onOpen: (view: ViewKey, filters?: Partial<TxFilters>) => void;
 }
 
@@ -34,7 +39,7 @@ function difference(nowCents: number, thenCents: number): string {
   return `${formatMoney(Math.abs(d))} ${d > 0 ? "more than" : "less than"}`;
 }
 
-export function Overview({ finance, onOpen }: Props) {
+export function Overview({ finance, plans, onOpen }: Props) {
   const { status, snapshot, transactions, categoriesById, today } = finance;
 
   const view = useMemo(() => {
@@ -57,6 +62,12 @@ export function Overview({ finance, onOpen }: Props) {
       accounts: new Map(snapshot.accounts.map((a) => [a.id, a.name])),
     };
   }, [snapshot, transactions, categoriesById, today]);
+
+  const ahead = useMemo(() => upcoming(plans.recurring, today, 14), [plans.recurring, today]);
+  const goalRows = useMemo(
+    () => plans.goals.map((g) => ({ goal: g, p: goalProgress(g, plans.contributions, today) })).slice(0, 3),
+    [plans.goals, plans.contributions, today],
+  );
 
   if (status === "error") return <LoadFailed message={finance.error ?? ""} onRetry={finance.reload} />;
   if (!view || status === "loading") return <LoadingBlock label="Loading your finances…" />;
@@ -180,6 +191,65 @@ export function Overview({ finance, onOpen }: Props) {
               })}
             </ul>
           )}
+        </Card>
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <Card as="section" aria-labelledby="cu" className="p-6 max-md:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 id="cu" className="text-heading text-ink">
+              Coming up
+            </h2>
+            <BasisTag basis="projection" />
+          </div>
+          {ahead.occurrences.length === 0 ? (
+            <p className="mt-3 text-body text-ink-tertiary">Nothing expected in the next 14 days.</p>
+          ) : (
+            <ul className="mt-2 divide-y divide-line">
+              {ahead.occurrences.slice(0, 5).map((o) => (
+                <li key={o.payment.key + o.date} className="flex items-center justify-between gap-3 py-2.5">
+                  <span className="min-w-0">
+                    <span className="block truncate text-body font-medium text-ink">{o.payment.merchant}</span>
+                    <span className="block text-label font-normal text-ink-tertiary">
+                      {parseISODate(o.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                    </span>
+                  </span>
+                  <span className={"text-body tabular-nums " + (o.payment.direction === "in" ? "text-success" : "text-ink")}>
+                    {formatMoney(o.payment.direction === "in" ? o.payment.amountCents : -o.payment.amountCents, { signed: true })}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Button variant="tertiary" size="sm" className="-ml-3 mt-2" onClick={() => onOpen("bills")}>
+            See all bills
+          </Button>
+        </Card>
+
+        <Card as="section" aria-labelledby="gl" className="p-6 max-md:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 id="gl" className="text-heading text-ink">
+              Goals
+            </h2>
+          </div>
+          {goalRows.length === 0 ? (
+            <p className="mt-3 text-body text-ink-tertiary">No goals yet. Set a target and track how it's going.</p>
+          ) : (
+            <ul className="mt-3 space-y-4">
+              {goalRows.map(({ goal, p }) => (
+                <li key={goal.id}>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="truncate text-body font-medium text-ink">{goal.name}</span>
+                    <span className="text-body tabular-nums text-ink-secondary">{Math.round(p.fraction * 100)}%</span>
+                  </div>
+                  <ProgressBar fraction={p.fraction} className="mt-1.5" />
+                </li>
+              ))}
+            </ul>
+          )}
+          <Button variant="tertiary" size="sm" className="-ml-3 mt-3" onClick={() => onOpen("goals")}>
+            {goalRows.length === 0 ? "Create a goal" : "See all goals"}
+          </Button>
         </Card>
       </div>
 
