@@ -19,3 +19,11 @@ lettre = { version = "0.11", default-features = false, features = ["smtp-transpo
 mail-parser = "0.9"
 keyring = "3"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+
+# keyring 3 has no default credential store: without a platform feature it silently uses an
+# in-memory mock, and the app password would vanish when the app closes. Each OS needs its own.
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }

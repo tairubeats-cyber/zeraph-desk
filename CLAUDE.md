@@ -101,7 +101,8 @@ block and nothing else.
 Scope is deliberately small: home services only, email only, reply and follow-up
 only. Grounding is the business facts sheet (`src/lib/facts.ts`), not embeddings.
 Mail is IMAP + SMTP with an app password held in the OS keychain on the Rust
-side; OAuth is a v2 job. No installers, signing, auto-update, or billing until
+side; OAuth is a v2 job. Unsigned installers for Windows and Mac are built by
+`.github/workflows/build-installers.yml` (see `INSTALL.md`); signing, auto-update and billing wait until
 five customers are running.
 
 `BUILD-PLAN.md` holds the cut list and the ordered tasks. Work top down. Before

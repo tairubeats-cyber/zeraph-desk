@@ -13,6 +13,17 @@ npm run tauri dev
 
 Requires Node 20+, Rust (rustup), and the Tauri v2 prerequisites for your OS.
 
+## Installers
+
+Windows and Mac installers are built in the cloud by `.github/workflows/build-installers.yml`; see
+`INSTALL.md` for what users do and how to publish a release. To build the Windows installer locally:
+
+```bash
+npm run tauri build
+```
+
+A Mac build has to happen on a Mac (or in that workflow).
+
 ## Where things are
 
 | Path | What it holds |

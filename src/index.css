@@ -73,7 +73,7 @@ body {
   background: var(--background);
   color: var(--text-primary);
   font-family:
-    -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI",
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter Variable", "Segoe UI",
     sans-serif;
   font-size: 14px;
   line-height: 1.5;
