@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Sparkles } from "lucide-react";
 import { Sidebar } from "./components/Sidebar";
 import { SectionTabs } from "./components/SectionTabs";
 import { findItem, type ViewKey } from "./nav";
@@ -12,6 +13,10 @@ import { Bills } from "./views/Bills";
 import { Recurring } from "./views/Recurring";
 import { Budgets } from "./views/Budgets";
 import { Goals } from "./views/Goals";
+import { ActionCenter } from "./views/ActionCenter";
+import { Activity } from "./views/Activity";
+import { Ask, type Asked } from "./views/Ask";
+import { Preferences } from "./views/Preferences";
 import { Queue } from "./views/Queue";
 import { History } from "./views/History";
 import { Facts } from "./views/Facts";
@@ -23,6 +28,11 @@ import { emailConnector } from "./connectors/email";
 import { syncInbox, proposeFollowUps } from "./lib/sync";
 import { useFinance } from "./lib/finance/useFinance";
 import { usePlans } from "./lib/finance/usePlans";
+import { useIntel } from "./lib/finance/useIntel";
+import { answer } from "./lib/finance/ask";
+import { AskProvider } from "./components/finance/AskLink";
+import { AskPalette } from "./components/finance/AskPalette";
+import { NotificationBell } from "./components/finance/NotificationBell";
 import type { TxFilters } from "./lib/finance/filters";
 
 const SYNC_INTERVAL_MS = 60_000;
@@ -36,6 +46,8 @@ export default function App() {
   const [past, setPast] = useState<Action[]>([]);
   const [facts, setFacts] = useState<BusinessFacts>(EMPTY_FACTS);
   const [mailConnected, setMailConnected] = useState<boolean | null>(null);
+  const [asked, setAsked] = useState<Asked[]>([]);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -47,6 +59,34 @@ export default function App() {
 
   const finance = useFinance(flash);
   const plans = usePlans(finance, flash);
+  const intel = useIntel(finance, plans, flash);
+
+  /** Work out an answer from the data on this computer and show it on the Ask screen. */
+  const ask = useCallback(
+    (question: string) => {
+      if (!intel.askContext) {
+        flash("Still loading your finances. Try again in a moment.");
+        return;
+      }
+      const result = answer(question, intel.askContext);
+      setAsked((prev) => [{ id: crypto.randomUUID(), at: new Date().toISOString(), answer: result }, ...prev].slice(0, 20));
+      setTxPreset(undefined);
+      setView("ask");
+    },
+    [intel.askContext, flash],
+  );
+
+  // Ctrl+K / ⌘K opens Ask from anywhere.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const current = findItem(view);
 
@@ -54,7 +94,7 @@ export default function App() {
     if (!current.item.built) return <ComingSoon item={current.item} onOverview={() => open("overview")} />;
     switch (view) {
       case "overview":
-        return <Overview finance={finance} plans={plans} onOpen={open} />;
+        return <Overview finance={finance} plans={plans} intel={intel} onOpen={open} />;
       case "accounts":
         return <Accounts finance={finance} />;
       case "transactions":
@@ -69,6 +109,14 @@ export default function App() {
         return <Budgets finance={finance} plans={plans} />;
       case "goals":
         return <Goals finance={finance} plans={plans} />;
+      case "action-center":
+        return <ActionCenter finance={finance} plans={plans} intel={intel} onOpen={open} onNotify={flash} />;
+      case "activity":
+        return <Activity finance={finance} intel={intel} onOpen={open} />;
+      case "ask":
+        return <Ask history={asked} ready={intel.askContext !== null} onAsk={ask} onOpen={open} />;
+      case "preferences":
+        return <Preferences intel={intel} />;
       case "queue":
         return (
           <Queue
@@ -203,6 +251,7 @@ export default function App() {
   return (
     // flex-col-reverse puts the nav (first in the DOM, so first for keyboard and
     // screen readers) at the bottom on phone widths.
+    <AskProvider value={ask}>
     <div className="flex h-full flex-col-reverse md:flex-row">
       <a
         href="#main"
@@ -215,7 +264,13 @@ export default function App() {
         Skip to content
       </a>
 
-      <Sidebar current={view} pendingCount={pending.length} onSelect={(v) => open(v)} />
+      <Sidebar
+        current={view}
+        badges={{ queue: pending.length, "action-center": intel.items.filter((i) => !i.state.read).length }}
+        onAsk={() => setPaletteOpen(true)}
+        bell={<NotificationBell intel={intel} onOpen={open} />}
+        onSelect={(v) => open(v)}
+      />
 
       <main id="main" tabIndex={-1} className="min-w-0 flex-1 overflow-y-auto focus:outline-none">
         <div
@@ -225,6 +280,17 @@ export default function App() {
             (current.group?.narrow || view === "more" ? "max-w-[760px]" : "max-w-[1120px]")
           }
         >
+          {/* Phone widths: the sidebar's Ask and bell aren't there, so they sit here. */}
+          <div className="mb-3 flex items-center justify-end gap-1.5 md:hidden">
+            <button
+              onClick={() => setPaletteOpen(true)}
+              aria-label="Ask ZeraphDesk"
+              className="flex h-9 w-9 items-center justify-center rounded-control border border-line bg-surface text-ink-secondary shadow-card"
+            >
+              <Sparkles className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+            </button>
+            <NotificationBell intel={intel} onOpen={open} />
+          </div>
           <SectionTabs current={view} onSelect={(v) => open(v)} />
           {renderView()}
         </div>
@@ -234,6 +300,7 @@ export default function App() {
       <div role="status" aria-live="polite" className="sr-only">
         {toast?.text}
       </div>
+      <AskPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onAsk={ask} />
       {toast && (
         <div
           key={toast.id}
@@ -244,5 +311,6 @@ export default function App() {
         </div>
       )}
     </div>
+    </AskProvider>
   );
 }

@@ -145,10 +145,11 @@ export const GROUPS: NavGroup[] = [
     key: "intelligence",
     label: "Intelligence",
     icon: Sparkles,
+    narrow: true,
     items: [
-      { key: "action-center", label: "Action Center", icon: ListChecks, built: false, phase: 3, about: "Things that deserve your attention, with the data behind each and the options you have." },
-      { key: "ask", label: "Ask ZeraphDesk", icon: Sparkles, built: false, phase: 3, about: "Ask questions about your own numbers. Answers show the data they used." },
-      { key: "activity", label: "Activity", icon: Activity, built: false, phase: 3, about: "A chronological feed of what changed in your finances." },
+      { key: "action-center", label: "Action Center", icon: ListChecks, built: true, phase: 3, about: "Things that deserve your attention, with the data behind each and the options you have." },
+      { key: "ask", label: "Ask ZeraphDesk", icon: Sparkles, built: true, phase: 3, about: "Ask questions about your own numbers. Answers show the data they used." },
+      { key: "activity", label: "Activity", icon: Activity, built: true, phase: 3, about: "A chronological feed of what changed in your finances." },
     ],
   },
   {
@@ -171,7 +172,7 @@ export const GROUPS: NavGroup[] = [
       { key: "profile", label: "Profile", icon: User, built: false, about: "Your name and how ZeraphDesk addresses you." },
       { key: "connections", label: "Connections", icon: Plug, built: true, about: "The email account and service seat ZeraphDesk uses." },
       { key: "security", label: "Security", icon: Lock, built: true, about: "What stays on this computer, and what leaves it." },
-      { key: "preferences", label: "Preferences", icon: SlidersHorizontal, built: false, about: "What ZeraphDesk watches, and which notifications you get." },
+      { key: "preferences", label: "Preferences", icon: SlidersHorizontal, built: true, about: "What ZeraphDesk watches, and which notifications you get." },
     ],
   },
 ];

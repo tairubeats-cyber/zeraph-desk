@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
+import { AskLink } from "@/components/finance/AskLink";
 import { CashFlowChart } from "@/components/finance/CashFlowChart";
 import { BasisTag, CategoryGlyph, SampleNotice } from "@/components/finance/parts";
 import { ProgressBar, Stat } from "@/components/finance/inputs";
@@ -54,7 +55,11 @@ export function CashFlow({
 
   return (
     <div>
-      <PageHeader title="Cash Flow" description="What came in, what went out, and what's left over." />
+      <PageHeader
+        title="Cash Flow"
+        description="What came in, what went out, and what's left over."
+        actions={<AskLink label="Ask what changed" question="What changed compared with last month?" />}
+      />
       {finance.origin === "sample" && <SampleNotice />}
 
       <Card as="section" aria-labelledby="cf-now" className="p-6 max-md:p-5">

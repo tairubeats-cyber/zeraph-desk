@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/PageHeader";
+import { AskLink } from "@/components/finance/AskLink";
 import { BasisTag, CategoryGlyph, SampleNotice } from "@/components/finance/parts";
 import { MoneyInput, ProgressBar, Stat } from "@/components/finance/inputs";
 import { gate } from "@/components/finance/gate";
@@ -59,11 +60,14 @@ export function Budgets({ finance, plans }: { finance: Finance; plans: Plans }) 
         title="Budgets"
         description={`Monthly limits by category, for ${monthLabel(monthKey(today))}.`}
         actions={
-          suggestions.size > 0 ? (
-            <Button variant="secondary" onClick={() => void plans.setBudgets(suggestions)}>
-              Fill from my averages
-            </Button>
-          ) : undefined
+          <>
+            <AskLink label="Ask about budgets" question="Am I within my budgets?" />
+            {suggestions.size > 0 && (
+              <Button variant="secondary" onClick={() => void plans.setBudgets(suggestions)}>
+                Fill from my averages
+              </Button>
+            )}
+          </>
         }
       />
       {finance.origin === "sample" && <SampleNotice />}

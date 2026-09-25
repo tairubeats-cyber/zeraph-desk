@@ -162,11 +162,28 @@ wording and structure.
   contributions); it is not read from an account until a provider exists.
 - **The event log holds ids and kinds only.** Amounts, names and merchants stay
   out of it; a recurring payment is logged by a one-way fingerprint of its key.
-- **Order of work:** phases 1 and 2 done (shell, Overview, Accounts,
-  Transactions; Recurring, Bills, Cash Flow, Budgets, Goals). Then intelligence
-  (action center, activity, notifications, ask-your-data), then planning
-  (forecast, scenarios, debt, net-worth history), then wealth, then real
-  provider infrastructure. Don't fake a later phase inside an earlier one.
+- **Findings, notifications and Ask (phase 3).** `insights.ts` holds the detectors:
+  pure functions over the same data the screens show. Each finding carries its
+  numbers, why it might matter, and options that are choices, never commands.
+  Only the person's response to a finding (dismissed, read, first seen) is stored
+  (`fin_insights`); the finding itself is recomputed. Ids are stable per thing
+  and period, so a dismissal holds for that month only. Notifications are just
+  findings in a category the person left on. A detector switched off is not
+  "resolved". Changes in balances, investments and debt can't be detected until
+  balances have history.
+- **Ask ZeraphDesk is deterministic code, not a model** (`ask.ts`). It answers
+  from the data on this computer, shows what it was based on, and says "I can't"
+  rather than guess (for example why net worth moved, with no balance history).
+  Nothing about a question or the data is sent anywhere. If a model is ever put in
+  front of it to understand wording, it must call these same functions and add no
+  numbers of its own; whether any data may be sent to one is a separate decision.
+- **Seeding is idempotent.** Default rows go in with INSERT OR IGNORE behind a
+  single shared promise, never "insert if the table is empty"; concurrent loads
+  once left categories missing.
+- **Order of work:** phases 1 to 3 done (shell, Overview, Accounts, Transactions; Recurring,
+  Bills, Cash Flow, Budgets, Goals; Action Center, Activity, Ask, notifications,
+  Preferences). Then planning (forecast, scenarios, debt, net-worth history),
+  then wealth, then real provider infrastructure. Don't fake a later phase inside an earlier one.
 
 ## Trades
 

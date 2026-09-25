@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/field";
 import { SelectField } from "@/components/ui/select";
 import { PageHeader } from "@/components/PageHeader";
+import { AskLink } from "@/components/finance/AskLink";
 import { BasisTag, SampleNotice } from "@/components/finance/parts";
 import { MoneyInput, ProgressBar, Stat } from "@/components/finance/inputs";
 import { gate } from "@/components/finance/gate";
@@ -288,10 +289,13 @@ export function Goals({ finance, plans }: { finance: Finance; plans: Plans }) {
         title="Goals"
         description="What you're saving toward, and how it's going."
         actions={
+          <>
+            <AskLink label="Ask about goals" question="How much can I put toward my goals based on my cash flow?" />
           <Button variant="primary" onClick={() => setCreating(true)} disabled={creating}>
             <Plus className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
             New goal
           </Button>
+          </>
         }
       />
       {finance.origin === "sample" && <SampleNotice />}

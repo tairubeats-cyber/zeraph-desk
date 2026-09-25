@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/PageHeader";
+import { AskLink } from "@/components/finance/AskLink";
 import { LoadFailed, LoadingBlock, SampleNotice } from "@/components/finance/parts";
 import type { Finance } from "@/lib/finance/useFinance";
 import { accountTotals } from "@/lib/finance/analysis";
@@ -53,7 +54,11 @@ export function Accounts({ finance }: { finance: Finance }) {
 
   return (
     <div>
-      <PageHeader title="Accounts" description="Everything you own and owe, by kind of account." />
+      <PageHeader
+        title="Accounts"
+        description="Everything you own and owe, by kind of account."
+        actions={<AskLink label="Ask about my net worth" question="What's my net worth?" />}
+      />
       {finance.origin === "sample" && <SampleNotice />}
 
       <Card className="mb-4 grid grid-cols-3 gap-4 p-5 max-md:grid-cols-1">

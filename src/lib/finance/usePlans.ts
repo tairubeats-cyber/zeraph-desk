@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { db, newEvent } from "../db";
 import { buildRecurring, DEFAULT_MARK } from "./recurring";
+import { fingerprint } from "./fingerprint";
 import type { Finance } from "./useFinance";
 import type { Goal, GoalContribution, ManualRecurring, RecurringMark } from "./types";
 
@@ -10,13 +11,6 @@ interface Stored {
   contributions: GoalContribution[];
   marks: Map<string, RecurringMark>;
   manual: ManualRecurring[];
-}
-
-/** A short one-way fingerprint, so the event log can say "the same payment" without holding a merchant name. */
-function fingerprint(text: string): string {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193) >>> 0;
-  return `rec-${h.toString(16)}`;
 }
 
 function message(err: unknown): string {
@@ -167,7 +161,7 @@ export function usePlans(finance: Finance, onError: (message: string) => void) {
         const next: RecurringMark = { ...(storedRef.current?.marks.get(key) ?? DEFAULT_MARK(key)), ...changes };
         patch((s) => ({ ...s, marks: new Map(s.marks).set(key, next) }));
         await db.saveRecurringMark(next);
-        await db.log(newEvent("recurring_marked", fingerprint(key)));
+        await db.log(newEvent("recurring_marked", fingerprint(key, "rec")));
       }),
     [guarded, patch],
   );

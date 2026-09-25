@@ -13,6 +13,7 @@ import {
 } from "@/components/finance/parts";
 import type { Finance } from "@/lib/finance/useFinance";
 import type { Plans } from "@/lib/finance/usePlans";
+import type { Intel } from "@/lib/finance/useIntel";
 import { ProgressBar } from "@/components/finance/inputs";
 import { upcoming } from "@/lib/finance/cashflow";
 import { goalProgress } from "@/lib/finance/goals";
@@ -24,6 +25,7 @@ import type { ViewKey } from "@/nav";
 interface Props {
   finance: Finance;
   plans: Plans;
+  intel: Intel;
   onOpen: (view: ViewKey, filters?: Partial<TxFilters>) => void;
 }
 
@@ -39,7 +41,7 @@ function difference(nowCents: number, thenCents: number): string {
   return `${formatMoney(Math.abs(d))} ${d > 0 ? "more than" : "less than"}`;
 }
 
-export function Overview({ finance, plans, onOpen }: Props) {
+export function Overview({ finance, plans, intel, onOpen }: Props) {
   const { status, snapshot, transactions, categoriesById, today } = finance;
 
   const view = useMemo(() => {
@@ -193,6 +195,38 @@ export function Overview({ finance, plans, onOpen }: Props) {
           )}
         </Card>
       </div>
+
+      <Card as="section" aria-labelledby="wl" className="mt-4 p-6 max-md:p-5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 id="wl" className="text-heading text-ink">
+            {intel.items.length === 0 ? "Nothing needs a look" : `${intel.items.length} ${intel.items.length === 1 ? "thing" : "things"} worth a look`}
+          </h2>
+          <Button variant="tertiary" size="sm" onClick={() => onOpen("action-center")}>
+            Open Action Center
+          </Button>
+        </div>
+        {intel.items.length > 0 && (
+          <ul className="mt-2 divide-y divide-line">
+            {intel.items.slice(0, 3).map(({ insight }) => (
+              <li key={insight.id}>
+                <button
+                  onClick={() => onOpen("action-center")}
+                  className="flex w-full items-start gap-3 py-3 text-left transition-colors duration-150 ease-standard hover:bg-surface-secondary"
+                >
+                  <span
+                    aria-hidden="true"
+                    className={"mt-2 h-2 w-2 shrink-0 rounded-full " + (insight.severity === "attention" ? "bg-warning" : "bg-chart-muted")}
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-body font-medium text-ink">{insight.title}</span>
+                    <span className="block text-label font-normal text-ink-tertiary">{insight.summary}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Card as="section" aria-labelledby="cu" className="p-6 max-md:p-5">

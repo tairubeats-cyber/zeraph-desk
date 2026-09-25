@@ -10,6 +10,8 @@ import type { Action, ActionKind, ActionPayload, ActionStatus } from "./actions"
 import type { Contact, Thread, Channel, Message } from "./types";
 import { type BusinessFacts, EMPTY_FACTS } from "./facts";
 import { type Event, type EventKind, newEvent } from "./events";
+import { type FinancePreferences, mergePrefs } from "./finance/prefs";
+import type { InsightState } from "./finance/intel";
 import type {
   Autopay,
   Budget,
@@ -32,6 +34,7 @@ const DB_PATH = "sqlite:zeraph.db";
 const FACTS_KEY = "business_facts";
 const SYNC_CURSOR_KEY = "mail_sync_cursor";
 const SEAT_TOKEN_KEY = "seat_token";
+const FIN_PREFS_KEY = "fin_preferences";
 
 interface ContactRow {
   id: string;
@@ -186,6 +189,7 @@ const THREAD_COLUMNS: Partial<Record<keyof Thread, string>> = {
 };
 
 let connection: Promise<Database> | null = null;
+let categorySeed: Promise<void> | null = null;
 
 function open(): Promise<Database> {
   if (!connection) {
@@ -471,16 +475,29 @@ export const db = {
   /** The user's categories. First call writes the defaults, after which the database is the source of truth. */
   async finCategories(): Promise<Category[]> {
     const handle = await open();
-    let rows = await handle.select<CategoryRow[]>("SELECT * FROM fin_categories ORDER BY position ASC");
-    if (rows.length === 0) {
+    // Seed once, and only what's missing. Two loads can arrive together (React's dev double-load, or several
+    // screens starting at once); a plain "insert if the table is empty" let each see the other's half-finished
+    // work and left categories missing. INSERT OR IGNORE never overwrites an edit, and repairs a table that
+    // an earlier launch left short.
+    categorySeed ??= (async () => {
+      const marks = DEFAULT_CATEGORIES.map((_, i) => `$${i + 1}`).join(", ");
+      const [have] = await handle.select<{ count: number }[]>(
+        `SELECT COUNT(*) as count FROM fin_categories WHERE id IN (${marks})`,
+        DEFAULT_CATEGORIES.map((c) => c.id),
+      );
+      if (have.count >= DEFAULT_CATEGORIES.length) return;
       for (const [i, c] of DEFAULT_CATEGORIES.entries()) {
         await handle.execute(
-          "INSERT INTO fin_categories (id, name, kind, position, hidden) VALUES ($1, $2, $3, $4, 0)",
+          "INSERT OR IGNORE INTO fin_categories (id, name, kind, position, hidden) VALUES ($1, $2, $3, $4, 0)",
           [c.id, c.name, c.kind, i],
         );
       }
-      rows = await handle.select<CategoryRow[]>("SELECT * FROM fin_categories ORDER BY position ASC");
-    }
+    })().catch((err) => {
+      categorySeed = null; // a failed seed must be retried, not remembered
+      throw err;
+    });
+    await categorySeed;
+    const rows = await handle.select<CategoryRow[]>("SELECT * FROM fin_categories ORDER BY position ASC");
     return rows.map((r) => ({
       id: r.id,
       name: r.name,
@@ -673,6 +690,84 @@ export const db = {
     const handle = await open();
     await handle.execute("DELETE FROM fin_recurring_manual WHERE id = $1", [id]);
     await handle.execute("DELETE FROM fin_recurring_marks WHERE key = $1", [`manual:${id}`]);
+  },
+
+  // --- Finance phase 3: preferences and the state of each finding. ---
+
+  async finPreferences(): Promise<FinancePreferences> {
+    const handle = await open();
+    const rows = await handle.select<{ value: string }[]>("SELECT value FROM settings WHERE key = $1", [FIN_PREFS_KEY]);
+    if (!rows.length) return mergePrefs(null);
+    try {
+      return mergePrefs(JSON.parse(rows[0].value));
+    } catch {
+      return mergePrefs(null);
+    }
+  },
+
+  async saveFinPreferences(prefs: FinancePreferences): Promise<void> {
+    const handle = await open();
+    await handle.execute(
+      `INSERT INTO settings (key, value) VALUES ($1, $2)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      [FIN_PREFS_KEY, JSON.stringify(prefs)],
+    );
+  },
+
+  async insightStates(): Promise<InsightState[]> {
+    const handle = await open();
+    const rows = await handle.select<
+      {
+        id: string;
+        detector: string;
+        severity: string;
+        category: string;
+        title: string;
+        summary: string;
+        first_seen_at: string;
+        status: string;
+        read: number;
+        notif_hidden: number;
+        updated_at: string;
+      }[]
+    >("SELECT * FROM fin_insights ORDER BY first_seen_at DESC");
+    return rows.map((r) => ({
+      id: r.id,
+      detector: r.detector as InsightState["detector"],
+      severity: r.severity as InsightState["severity"],
+      category: r.category as InsightState["category"],
+      title: r.title,
+      summary: r.summary,
+      firstSeenAt: r.first_seen_at,
+      status: r.status as InsightState["status"],
+      read: r.read === 1,
+      notifHidden: r.notif_hidden === 1,
+      updatedAt: r.updated_at,
+    }));
+  },
+
+  async saveInsightState(s: InsightState): Promise<void> {
+    const handle = await open();
+    await handle.execute(
+      `INSERT INTO fin_insights (id, detector, severity, category, title, summary, first_seen_at, status, read, notif_hidden, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       ON CONFLICT(id) DO UPDATE SET status = excluded.status, read = excluded.read,
+         notif_hidden = excluded.notif_hidden, updated_at = excluded.updated_at,
+         title = excluded.title, summary = excluded.summary, first_seen_at = excluded.first_seen_at`,
+      [s.id, s.detector, s.severity, s.category, s.title, s.summary, s.firstSeenAt, s.status, s.read ? 1 : 0, s.notifHidden ? 1 : 0, s.updatedAt],
+    );
+  },
+
+  /** The newest events of the given kinds, newest first. */
+  async recentEvents(kinds: EventKind[], limit = 200): Promise<Event[]> {
+    if (kinds.length === 0) return [];
+    const handle = await open();
+    const marks = kinds.map((_, i) => `${i + 1}`).join(", ");
+    const rows = await handle.select<EventRow[]>(
+      `SELECT * FROM events WHERE kind IN (${marks}) ORDER BY at DESC LIMIT ${kinds.length + 1}`,
+      [...kinds, limit],
+    );
+    return rows.map(rowToEvent);
   },
 
   async log(...entries: Event[]): Promise<void> {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ShieldCheck } from "lucide-react";
+import { ChevronDown, ShieldCheck, Sparkles } from "lucide-react";
 import {
   GROUPS,
   MORE,
@@ -14,9 +14,20 @@ import { cn } from "@/lib/utils";
 
 interface Props {
   current: ViewKey;
-  pendingCount: number;
+  /** Counts to show beside items, keyed by view. */
+  badges: Partial<Record<ViewKey, number>>;
+  /** Opens Ask ZeraphDesk. */
+  onAsk: () => void;
+  /** The notification bell, so the sidebar and the phone header can share one. */
+  bell: React.ReactNode;
   onSelect: (view: ViewKey) => void;
 }
+
+/** What a count beside an item means, for screen readers. */
+const BADGE_WORD: Partial<Record<ViewKey, string>> = { queue: "waiting", "action-center": "to look at" };
+
+/** The shortcut that opens Ask, spelled the way this computer spells it. */
+export const ASK_SHORTCUT = typeof navigator !== "undefined" && /mac/i.test(navigator.platform) ? "⌘K" : "Ctrl K";
 
 const COLLAPSED_KEY = "zeraphdesk.nav.collapsed";
 
@@ -59,7 +70,7 @@ const PHONE_TABS: { label: string; icon: NavItem["icon"]; target: ViewKey; group
  * phone widths. Labels stay in the DOM at every size so screen readers get
  * them. The list scrolls, so the full tree fits any window height.
  */
-export function Sidebar({ current, pendingCount, onSelect }: Props) {
+export function Sidebar({ current, badges, onAsk, bell, onSelect }: Props) {
   const [collapsed, setCollapsed] = useState<string[]>(loadCollapsed);
   const currentGroup = groupOf(current);
 
@@ -71,7 +82,8 @@ export function Sidebar({ current, pendingCount, onSelect }: Props) {
     });
   }
 
-  const badge = (item: NavItem) => item.key === "queue" && pendingCount > 0;
+  const count = (item: NavItem) => badges[item.key] ?? 0;
+  const badge = (item: NavItem) => count(item) > 0;
 
   // Render helpers, not components: a nested component would remount on every render and drop keyboard focus.
   function item(it: NavItem) {
@@ -108,9 +120,9 @@ export function Sidebar({ current, pendingCount, onSelect }: Props) {
           {badge(it) && (
             <>
               <span aria-hidden="true" className="ml-auto hidden text-label tabular-nums text-ink-tertiary lg:inline">
-                {pendingCount}
+                {count(it)}
               </span>
-              <span className="sr-only">, {pendingCount} waiting</span>
+              <span className="sr-only">, {count(it)} {BADGE_WORD[it.key] ?? "new"}</span>
             </>
           )}
         </button>
@@ -135,7 +147,7 @@ export function Sidebar({ current, pendingCount, onSelect }: Props) {
           {!open && hasPending && (
             <>
               <span aria-hidden="true" className="ml-1 h-1.5 w-1.5 rounded-full bg-accent" />
-              <span className="sr-only">, {pendingCount} waiting</span>
+              <span className="sr-only">, {g.items.reduce((sum, i) => sum + count(i), 0)} new</span>
             </>
           )}
           <ChevronDown
@@ -148,6 +160,14 @@ export function Sidebar({ current, pendingCount, onSelect }: Props) {
       </div>
     );
   }
+
+  // A tab's count is everything beside the items it leads to; "More" covers the groups without a tab of their own.
+  const tabGroups = PHONE_TABS.flatMap((t) => (t.groupKey ? [t.groupKey] : []));
+  const tabCount = (t: (typeof PHONE_TABS)[number]) =>
+    GROUPS.filter((g) => (t.target === "more" ? !tabGroups.includes(g.key) : g.key === t.groupKey)).reduce(
+      (sum, g) => sum + g.items.reduce((n, i) => n + count(i), 0),
+      0,
+    );
 
   const phoneActive = (t: (typeof PHONE_TABS)[number]) => {
     if (t.target === "overview") return current === "overview";
@@ -170,6 +190,21 @@ export function Sidebar({ current, pendingCount, onSelect }: Props) {
             Z
           </div>
           <span className="hidden text-heading text-ink lg:inline">ZeraphDesk</span>
+        </div>
+
+        <div className="mb-3 flex flex-col items-center gap-1 lg:flex-row lg:gap-2">
+          <button
+            onClick={onAsk}
+            aria-label="Ask ZeraphDesk"
+            title={`Ask ZeraphDesk (${ASK_SHORTCUT})`}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control border border-line bg-surface text-ink-secondary shadow-card transition-colors duration-150 ease-standard hover:bg-surface-hover lg:w-auto lg:flex-1 lg:justify-start lg:gap-2 lg:px-3"
+          >
+            <Sparkles className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+            <span aria-hidden="true" className="hidden whitespace-nowrap text-label font-normal text-ink-tertiary lg:inline">
+              Ask ZeraphDesk
+            </span>
+          </button>
+          {bell}
         </div>
 
         <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
@@ -200,12 +235,12 @@ export function Sidebar({ current, pendingCount, onSelect }: Props) {
             >
               <span className="relative">
                 <Icon className={cn("h-[18px] w-[18px]", active && "text-accent")} strokeWidth={1.75} aria-hidden="true" />
-                {t.target === "more" && pendingCount > 0 && (
+                {tabCount(t) > 0 && (
                   <span aria-hidden="true" className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-accent ring-2 ring-sidebar" />
                 )}
               </span>
               {t.label}
-              {t.target === "more" && pendingCount > 0 && <span className="sr-only">, {pendingCount} waiting</span>}
+              {tabCount(t) > 0 && <span className="sr-only">, {tabCount(t)} new</span>}
             </button>
           );
         })}

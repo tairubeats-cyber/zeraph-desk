@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/field";
 import { Select, SelectField } from "@/components/ui/select";
 import { PageHeader } from "@/components/PageHeader";
+import { AskLink } from "@/components/finance/AskLink";
 import { BasisTag, CategoryGlyph, SampleNotice } from "@/components/finance/parts";
 import { MoneyInput, Stat } from "@/components/finance/inputs";
 import { gate } from "@/components/finance/gate";
@@ -241,10 +242,13 @@ export function Recurring({ finance, plans }: { finance: Finance; plans: Plans }
         title="Recurring"
         description="Payments that repeat, found in your transactions."
         actions={
+          <>
+            <AskLink label="Ask about subscriptions" question="What subscriptions am I paying for?" />
           <Button variant="secondary" onClick={() => setAdding((a) => !a)} aria-expanded={adding}>
             <Plus className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
             Add
           </Button>
+          </>
         }
       />
       {finance.origin === "sample" && <SampleNotice />}

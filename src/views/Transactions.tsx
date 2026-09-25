@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { PageHeader } from "@/components/PageHeader";
+import { AskLink } from "@/components/finance/AskLink";
 import { BasisTag, LoadFailed, LoadingBlock, SampleNotice, TransactionRow } from "@/components/finance/parts";
 import { TransactionDetail } from "@/components/finance/TransactionDetail";
 import { CategoryManager } from "@/components/finance/CategoryManager";
@@ -101,10 +102,13 @@ export function Transactions({ finance, preset }: Props) {
         title="Transactions"
         description="Search, sort and correct anything the categories got wrong."
         actions={
+          <>
+            <AskLink label="Ask about spending" question="Where did most of my money go this month?" />
           <Button variant="secondary" aria-expanded={managing} onClick={() => setManaging((m) => !m)}>
             <Tags className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
             Categories
           </Button>
+          </>
         }
       />
       {finance.origin === "sample" && <SampleNotice />}

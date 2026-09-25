@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { PageHeader } from "@/components/PageHeader";
+import { AskLink } from "@/components/finance/AskLink";
 import { Amount, BasisTag, CategoryGlyph, SampleNotice } from "@/components/finance/parts";
 import { Segmented, Stat } from "@/components/finance/inputs";
 import { gate } from "@/components/finance/gate";
@@ -110,7 +111,11 @@ export function Bills({ finance, plans }: { finance: Finance; plans: Plans }) {
 
   return (
     <div>
-      <PageHeader title="Bills" description="What's due, when, and whether it's been paid." />
+      <PageHeader
+        title="Bills"
+        description="What's due, when, and whether it's been paid."
+        actions={<AskLink label="Ask about bills" question="What bills are coming up?" />}
+      />
       {finance.origin === "sample" && <SampleNotice />}
 
       <Card as="section" aria-labelledby="bl-ahead" className="p-6 max-md:p-5">

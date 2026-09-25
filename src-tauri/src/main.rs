@@ -30,6 +30,12 @@ fn main() {
             sql: include_str!("../migrations/004_money_management.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 5,
+            description: "finance insight state",
+            sql: include_str!("../migrations/005_intelligence.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

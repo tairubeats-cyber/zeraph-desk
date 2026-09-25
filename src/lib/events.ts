@@ -18,7 +18,11 @@ export type EventKind =
   | "budget_changed"
   | "goal_created"
   | "goal_contribution_added"
-  | "recurring_marked";
+  | "recurring_marked"
+  | "insight_detected"
+  | "insight_dismissed"
+  | "insight_reopened"
+  | "preferences_changed";
 
 export interface Event {
   id: ID;
