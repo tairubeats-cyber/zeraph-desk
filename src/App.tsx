@@ -147,16 +147,13 @@ export default function App() {
       await db.log(newEvent("action_sent", action.id, { kind: action.kind }));
       flash("Reply sent");
     } catch (err) {
-      await db.updateAction(action.id, { status: "failed" });
+      // A reply that didn't go out goes back to the queue, with the text as edited, so it can't
+      // quietly disappear into Sent while the customer waits. The failure stays in the event log.
+      await db.updateAction(action.id, { status: "pending", decidedAt: null });
       await db.log(newEvent("action_failed", action.id, { kind: action.kind }));
       // Tauri rejects with the raw string an Err(String) command returns, not an Error instance.
-      flash(
-        typeof err === "string"
-          ? err
-          : err instanceof Error
-            ? err.message
-            : "That didn't send. It's still in your queue.",
-      );
+      const reason = (typeof err === "string" ? err : err instanceof Error ? err.message : "").replace(/[.\s]+$/, "");
+      flash(reason ? `Didn't send: ${reason}. It's still in your queue.` : "Didn't send. It's still in your queue.");
     }
     await refresh();
   }
