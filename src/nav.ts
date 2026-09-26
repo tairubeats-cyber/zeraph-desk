@@ -3,10 +3,12 @@ import {
   ArrowDownUp,
   Building2,
   CalendarDays,
+  ChartColumn,
   ChartLine,
   ChartPie,
   CreditCard,
   Ellipsis,
+  HeartPulse,
   Inbox,
   LayoutDashboard,
   ListChecks,
@@ -38,7 +40,9 @@ import {
 export type ViewKey =
   | "overview"
   | "accounts"
+  | "health"
   | "transactions"
+  | "spending"
   | "cash-flow"
   | "bills"
   | "recurring"
@@ -88,6 +92,7 @@ export const PHASES: Record<number, string> = {
   4: "Planning",
   5: "Wealth",
   6: "Infrastructure",
+  7: "Financial health",
 };
 
 export const OVERVIEW: NavItem = {
@@ -114,7 +119,9 @@ export const GROUPS: NavGroup[] = [
     icon: Wallet,
     items: [
       { key: "accounts", label: "Accounts", icon: Wallet, built: true, phase: 1, about: "Every account you own or owe on, by kind." },
+      { key: "health", label: "Financial Health", icon: HeartPulse, built: true, phase: 7, about: "Six areas of your finances (cash flow, savings, debt, investing, spending and goals), each with the figures behind it. No single score." },
       { key: "transactions", label: "Transactions", icon: ReceiptText, built: true, phase: 1, about: "Search, sort and categorise what came in and went out." },
+      { key: "spending", label: "Spending", icon: ChartColumn, built: true, phase: 7, about: "Where the money went, by category, with how it compares with last month and last year, who it went to, and what stands out." },
       { key: "cash-flow", label: "Cash Flow", icon: ArrowDownUp, built: true, phase: 2, about: "Income against spending over time, and the recurring payments that shape it." },
       { key: "bills", label: "Bills", icon: CalendarDays, built: true, phase: 2, about: "Upcoming bills on a calendar, with due dates, paid status and autopay." },
       { key: "recurring", label: "Recurring", icon: Repeat, built: true, phase: 2, about: "Subscriptions and repeating payments found in your transactions, with what each costs a year." },

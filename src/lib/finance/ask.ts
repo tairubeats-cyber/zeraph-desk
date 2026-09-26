@@ -39,6 +39,7 @@ import { allocation, concentration, contributionSummary, holdingRows, investment
 import { DEFAULT_LONG_TERM, monthsToTarget, projectRange } from "./longterm";
 import { average, completeMonths, monthlyFlows, upcoming } from "./cashflow";
 import { budgetRows } from "./budget";
+import { buildHealth, formatMetric } from "./health";
 import { goalProgress } from "./goals";
 import { FREQUENCY_LABELS } from "./recurring";
 import {
@@ -72,6 +73,10 @@ export interface AskContext {
   positions: Position[];
   activity: InvestmentActivity[];
   longTerm: LongTermAssumptions;
+  /** The checking balance the person likes to stay above, if they set one. */
+  reserveCents?: number | null;
+  /** The emergency fund target they set, in months of spending, if any. */
+  emergencyMonths?: number | null;
 }
 
 export interface AnswerLink {
@@ -96,6 +101,7 @@ export interface Answer {
 }
 
 export const SUGGESTED_QUESTIONS = [
+  "How am I doing financially?",
   "Where did most of my money go this month?",
   "What changed compared with last month?",
   "What bills are coming up?",
@@ -724,6 +730,42 @@ function cashNow(c: AskContext, q: string): Answer {
   });
 }
 
+/** Where each of the six health areas stands, in the app's own words. Never a score. */
+function healthAnswer(c: AskContext, q: string): Answer {
+  const dims = buildHealth({
+    today: c.today,
+    accounts: c.accounts,
+    transactions: c.transactions,
+    categories: kindMap(c),
+    recurring: c.recurring,
+    goals: c.goals,
+    contributions: c.contributions,
+    terms: c.debtTerms,
+    holdings: c.holdings,
+    planned: c.planned,
+    balanceHistory: c.history,
+    positions: c.positions,
+    activity: c.activity,
+    longTerm: c.longTerm,
+    reserveCents: c.reserveCents ?? null,
+    emergencyMonths: c.emergencyMonths ?? null,
+  });
+  const unavailable = dims.flatMap((d) => d.metrics.filter((m) => m.value === null && m.kind !== "text").map((m) => m.label));
+  const notes = [];
+  if (unavailable.length > 0) {
+    notes.push(`Not available yet: ${unavailable.slice(0, 4).join("; ")}${unavailable.length > 4 ? ` and ${unavailable.length - 4} more` : ""}. Some need details only you can enter, such as debt rates and payments or an emergency fund target.`);
+  }
+  return frame(c, q, {
+    headline: "Here's where each area of your finances stands.",
+    paragraphs: ["These are separate readings, not a grade. Each one is worked out from your own accounts, and the detail behind each is on the Financial Health screen."],
+    table: { columns: ["Area", "Where it stands"], rows: dims.map((d) => [d.label, d.summary]) },
+    facts: dims.flatMap((d) => d.metrics.slice(0, 1).map((m) => ({ label: m.label, value: formatMetric(m) }))),
+    used: ["Transactions, balances, recurring payments, goals, and the debt details, targets and assumptions you entered"],
+    notes,
+    links: [{ label: "Open Financial Health", view: "health" }],
+  });
+}
+
 function incomeAnswer(c: AskContext, q: string, p: Period): Answer {
   const cats = kindMap(c);
   const income = c.transactions.filter((t) => inRange(t, p) && cats.get(t.categoryId)?.kind === "income");
@@ -777,6 +819,7 @@ export function answer(question: string, c: AskContext): Answer {
   if (/(retire|long.?term|nest egg)/.test(q) || (investy && /(\d+\s*years?|future|grow)/.test(q))) return longTermAnswer(c, question);
   if (/(allocation|diversif|asset class|\bstocks?\b|\bbonds?\b|concentrat)/.test(q) || (investy && /(split|mix|risk|spread)/.test(q))) return allocationAnswer(c, question);
   if (investy) return portfolioAnswer(c, question);
+  if (/(how (am|are) (i|we) doing|how (are|is) (my|our) (finances|money|situation)|how do (my|our) (finances|things) look|financial (health|picture|situation|shape|check))/.test(q)) return healthAnswer(c, question);
   if (/net worth|worth/.test(q)) return /(why|what|how).*(change|changed|move|moved|drop|dropped|go up|went up|go down|went down|differ)|change.*net worth/.test(q) ? netWorthWhy(c, question) : netWorth(c, question);
   if (/(debt.?free|pay(ing)? (it |them |my \w+ )?off|payoff|pay down)/.test(q) || (/when (will|do) i/.test(q) && /(debt|loan|card|mortgage)/.test(q))) return debtFreeAnswer(c, question);
   if (/(run (out|low|short)|go (negative|below zero|overdrawn)|overdraft|will i have enough|forecast|projected|project my|what will my (balance|cash|checking)|balance (in|by|after|at the end)|cash (in|by|at the end of))/.test(q)) return forecastAnswer(c, question);

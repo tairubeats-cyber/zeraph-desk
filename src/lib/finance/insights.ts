@@ -29,6 +29,7 @@ import type {
 } from "./types";
 import { holdingRows, performance } from "./investments";
 import { RANGES } from "./networth";
+import { median, UNUSUAL_FACTOR, UNUSUAL_MIN_CENTS, UNUSUAL_MIN_HISTORY } from "./spending";
 import type { TxFilters } from "./filters";
 import { DETECTORS, type DetectorId, type FinancePreferences, type NotificationCategory } from "./prefs";
 import { averageMonthlySpend, budgetRows } from "./budget";
@@ -90,12 +91,6 @@ const day = (iso: string) =>
 const inDays = (n: number) => (n === 0 ? "today" : n === 1 ? "tomorrow" : `in ${n} days`);
 
 const catName = (c: DetectContext, id: string) => c.categories.find((x) => x.id === id)?.name ?? "Other";
-
-function median(xs: number[]): number {
-  const s = [...xs].sort((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-}
 
 type Detector = (c: DetectContext) => Insight[];
 
@@ -373,10 +368,10 @@ const unusualSpend: Detector = (c) => {
     const prior = c.transactions
       .filter((p) => p.categoryId === t.categoryId && p.amountCents < 0 && p.date < cutoff)
       .map((p) => -p.amountCents);
-    if (prior.length < 4) return [];
+    if (prior.length < UNUSUAL_MIN_HISTORY) return [];
     const usual = median(prior);
     const amount = -t.amountCents;
-    if (amount < 10_000 || amount < usual * 3) return [];
+    if (amount < UNUSUAL_MIN_CENTS || amount < usual * UNUSUAL_FACTOR) return [];
     const name = catName(c, t.categoryId);
     return [
       {

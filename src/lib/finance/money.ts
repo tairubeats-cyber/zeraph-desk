@@ -49,6 +49,17 @@ export function recentMonthKeys(today: string, count: number): string[] {
   return Array.from({ length: count }, (_, i) => shiftMonth(current, i - (count - 1)));
 }
 
+/** "September 2025": a month with its year, for a comparison with another year where the bare name would be ambiguous. */
+export function monthYearLabel(key: string): string {
+  const [y, m] = key.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
+/** "Sep 27, 2023". */
+export function friendlyDate(iso: string): string {
+  return parseISODate(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 export function monthLabel(key: string, style: "long" | "short" = "long"): string {
   const [y, m] = key.split("-").map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString("en-US", { month: style });

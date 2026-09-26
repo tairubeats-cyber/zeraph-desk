@@ -262,6 +262,29 @@ wording and structure.
     - *Security wording* (`Security` in Settings) must keep saying what leaves this computer: a read-only key and
       a date range go to the bridge, balances and transactions come straight back, and SimpleFIN knows which
       accounts were linked.
+- **Financial health and spending analysis (phase 7).** Two screens, both pure calculations over what the
+  other screens already show (`health.ts`, `spending.ts`), so a figure means the same thing everywhere.
+  - *Financial Health is six areas and never a score* (cash flow, savings, debt, investing, spending, goals). A single
+    grade would hide the parts that matter and invite a verdict this app has no standing to give. Each area is a
+    handful of metrics, each tagged fact, calculation or projection, each with a one-sentence note on how it's
+    worked out. Every area links to the screen with the fuller picture and has a detail tab.
+  - *A figure that can't be worked out says why, in words, and shows no number.* Never zero: debt rates, payments,
+    an emergency-fund target and a checking reserve are things only the person can enter, and until they do the
+    metric reads "Not available yet" with what to enter and where (`formatMetric`).
+  - *The emergency-fund target is entered, never guessed* (`emergencyMonths` in preferences, 0.5 to 60 months).
+  - *Comparisons are honest about time.* A month still in progress is compared with the same days of the earlier
+    month, never a whole one. Year-over-year needs a whole month of data from a year ago (the month the history
+    starts in may be part-way through, so it doesn't count); without it the screen names the missing month and
+    the first date it has, instead of showing zero (`coversMonth`, `yearUnavailableReason`). The trend chart leaves out
+    months that aren't fully covered.
+  - *Wording stays neutral:* "$180 (4%) more than the same days of August", never "you overspent". Tests scan every
+    health string for verdict or advice words and for raw ISO dates. Unusual purchases say a purchase stands out
+    (at least $100 and 3 times the usual one, with 4 earlier purchases), not that it was a mistake; the finding
+    (`unusual-spend`) and the screen share those thresholds.
+  - *The sample has 15 months of transactions* so year-over-year has something to show. Each month is drawn from its
+    own seed, so adding older months never changes a newer one.
+  - *Ask answers "How am I doing financially?"* from the same figures (`healthAnswer`), lists what isn't available yet, and
+    says it isn't a grade.
 - **Seeding is idempotent.** Default rows go in with INSERT OR IGNORE behind a
   single shared promise, never "insert if the table is empty"; concurrent loads
   once left categories missing.
@@ -270,6 +293,9 @@ wording and structure.
   Preferences; Forecast, Scenarios, Debt, Net Worth; Investments with portfolio analysis
   and the long-term plan). Phase 6 is done except automatic sync: file import, SimpleFIN sync,
   balance snapshots and system notifications. Background or scheduled sync, and holdings from the bridge, are not built.
+  Phase 7 (financial health and spending analysis) is done; the spec defines only phases 1 to 6, so phase 7 was chosen by
+  the owner from the spec's own unbuilt sections.
+  Tests are in `tests/` (run `npm test`); add a suite for any new calculation.
   Don't fake a later phase inside an earlier one.
 
 ## Trades

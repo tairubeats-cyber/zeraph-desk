@@ -246,9 +246,11 @@ export function useIntel(finance: Finance, plans: Plans, planning: Planning, onE
             positions: finance.snapshot.positions,
             activity: finance.snapshot.investmentActivity,
             longTerm: planning.longTerm,
+            reserveCents: prefs?.reserveCents ?? null,
+            emergencyMonths: prefs?.emergencyMonths ?? null,
           }
         : null,
-    [finance.snapshot, finance.today, finance.origin, finance.transactions, finance.categories, plans.recurring, plans.budgets, plans.goals, plans.contributions, planning.holdings, planning.debtTerms, planning.planned, planning.longTerm],
+    [prefs?.reserveCents, prefs?.emergencyMonths, finance.snapshot, finance.today, finance.origin, finance.transactions, finance.categories, plans.recurring, plans.budgets, plans.goals, plans.contributions, planning.holdings, planning.debtTerms, planning.planned, planning.longTerm],
   );
 
   return {

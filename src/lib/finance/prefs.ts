@@ -71,6 +71,8 @@ export interface FinancePreferences {
   watch: Record<DetectorId, boolean>;
   /** Also show new findings as system notifications, while ZeraphDesk is open. Off until the person turns it on. */
   systemNotifications: boolean;
+  /** How many months of spending the person wants set aside as an emergency fund. null until they say; never guessed. */
+  emergencyMonths: number | null;
 }
 
 export const DEFAULT_PREFS: FinancePreferences = {
@@ -79,6 +81,7 @@ export const DEFAULT_PREFS: FinancePreferences = {
   notify: { money: true, bills: true, goals: true, investments: true, security: true, system: true },
   watch: Object.fromEntries(DETECTORS.map((d) => [d.id, true])) as Record<DetectorId, boolean>,
   systemNotifications: false,
+  emergencyMonths: null,
 };
 
 /** Read saved preferences, filling anything missing or malformed from the defaults. */
@@ -96,5 +99,6 @@ export function mergePrefs(saved: unknown): FinancePreferences {
     notify,
     watch,
     systemNotifications: bool(s.systemNotifications, false),
+    emergencyMonths: typeof s.emergencyMonths === "number" && s.emergencyMonths >= 0.5 && s.emergencyMonths <= 60 ? Math.round(s.emergencyMonths * 10) / 10 : null,
   };
 }

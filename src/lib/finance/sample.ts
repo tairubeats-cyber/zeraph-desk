@@ -111,6 +111,11 @@ function tidy(cents: number): number {
 
 /** Three years, so the longer Net Worth ranges have something to show. */
 const HISTORY_DAYS = 1095;
+/**
+ * How many months of transactions the sample has: the current one and fourteen before it, so a year-over-year comparison
+ * has something to compare with. Each month is drawn from its own seed, so adding older months never changes a newer one.
+ */
+const SAMPLE_MONTHS = 15;
 const DAYS_PER_MONTH = 30.4375;
 
 /**
@@ -270,7 +275,7 @@ export function generateSample(today: string): FinancialSnapshot {
   const transactions: Transaction[] = [];
   const cutoff = today;
 
-  for (const month of recentMonthKeys(today, 6)) {
+  for (const month of recentMonthKeys(today, SAMPLE_MONTHS)) {
     const [y, m] = month.split("-").map(Number);
     const rand = rng(y * 100 + m);
     const push = (t: Omit<Transaction, "pending">) => {

@@ -7,6 +7,8 @@ import { AllSections } from "./views/AllSections";
 import { ComingSoon } from "./views/ComingSoon";
 import { Overview } from "./views/Overview";
 import { Transactions } from "./views/Transactions";
+import { Spending } from "./views/Spending";
+import { Health } from "./views/Health";
 import { Accounts } from "./views/Accounts";
 import { CashFlow } from "./views/CashFlow";
 import { Bills } from "./views/Bills";
@@ -106,6 +108,10 @@ export default function App() {
         return <Accounts finance={finance} planning={planning} />;
       case "transactions":
         return <Transactions finance={finance} preset={txPreset} />;
+      case "health":
+        return <Health finance={finance} plans={plans} planning={planning} intel={intel} onOpen={open} />;
+      case "spending":
+        return <Spending finance={finance} plans={plans} onOpen={open} />;
       case "cash-flow":
         return <CashFlow finance={finance} plans={plans} onOpen={open} />;
       case "bills":

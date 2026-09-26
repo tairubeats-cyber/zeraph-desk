@@ -295,6 +295,27 @@ export function Overview({ finance, plans, planning, intel, onOpen }: Props) {
         </Card>
       </div>
 
+      <Card as="section" aria-labelledby="fh" className="mt-4 p-6 max-md:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2 id="fh" className="text-heading text-ink">
+              Financial health
+            </h2>
+            <p className="mt-1 max-w-[62ch] text-label font-normal text-ink-secondary">
+              Cash flow, savings, debt, investing, spending and goals, each with the figures behind it. There's no single score.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" onClick={() => onOpen("health")}>
+              See the six areas
+            </Button>
+            <Button variant="tertiary" size="sm" onClick={() => onOpen("spending")}>
+              Analyse spending
+            </Button>
+          </div>
+        </div>
+      </Card>
+
       <Card as="section" aria-labelledby="ra" className="mt-4">
         <div className="flex items-center justify-between gap-3 px-6 pb-2 pt-5 max-md:px-5">
           <h2 id="ra" className="text-heading text-ink">

@@ -34,6 +34,7 @@ export function LineChart({
   caption,
   format = (c) => formatMoney(c),
   zeroLine = false,
+  nonNegative = false,
   height = 208,
 }: {
   /** What each point is called, for the tooltip and the table ("Sep 25, 2026"). */
@@ -46,6 +47,8 @@ export function LineChart({
   format?: (cents: number) => string;
   /** Mark zero with a dashed line when the values cross it. The axis always fits the data, not zero. */
   zeroLine?: boolean;
+  /** For amounts that can't go below zero (spending): the axis padding never dips under it. */
+  nonNegative?: boolean;
   height?: number;
 }) {
   const [hover, setHover] = useState<number | null>(null);
@@ -63,11 +66,12 @@ export function LineChart({
     }
     const pad = (hi - lo) * 0.08;
     lo -= pad;
+    if (nonNegative && lo < 0) lo = 0;
     hi += pad;
     const x = (i: number) => (n <= 1 ? 50 : (i / (n - 1)) * 100);
     const y = (v: number) => 100 - ((v - lo) / (hi - lo)) * 100;
     return { lo, hi, x, y };
-  }, [series, n, zeroLine]);
+  }, [series, n, zeroLine, nonNegative]);
 
   if (n === 0) return null;
   const { lo, hi, x, y } = geometry;
