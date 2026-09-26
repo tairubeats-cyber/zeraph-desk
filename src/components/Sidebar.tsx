@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ShieldCheck, Sparkles } from "lucide-react";
+import { ChevronDown, Keyboard, ShieldCheck, Sparkles } from "lucide-react";
 import {
   GROUPS,
   MORE,
@@ -18,6 +18,8 @@ interface Props {
   badges: Partial<Record<ViewKey, number>>;
   /** Opens Ask ZeraphDesk. */
   onAsk: () => void;
+  /** Opens the list of keyboard shortcuts. */
+  onShortcuts: () => void;
   /** The notification bell, so the sidebar and the phone header can share one. */
   bell: React.ReactNode;
   onSelect: (view: ViewKey) => void;
@@ -70,7 +72,7 @@ const PHONE_TABS: { label: string; icon: NavItem["icon"]; target: ViewKey; group
  * phone widths. Labels stay in the DOM at every size so screen readers get
  * them. The list scrolls, so the full tree fits any window height.
  */
-export function Sidebar({ current, badges, onAsk, bell, onSelect }: Props) {
+export function Sidebar({ current, badges, onAsk, onShortcuts, bell, onSelect }: Props) {
   const [collapsed, setCollapsed] = useState<string[]>(loadCollapsed);
   const currentGroup = groupOf(current);
 
@@ -216,6 +218,14 @@ export function Sidebar({ current, badges, onAsk, bell, onSelect }: Props) {
           <ShieldCheck className="mt-px h-3.5 w-3.5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
           <span>Nothing sends until you approve it.</span>
         </div>
+        <button
+          onClick={onShortcuts}
+          className="mx-1 mt-2 hidden items-center gap-2 rounded-control px-2 py-1.5 text-meta text-ink-tertiary transition-colors duration-150 hover:bg-surface-secondary hover:text-ink lg:flex"
+        >
+          <Keyboard className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+          Keyboard shortcuts
+          <kbd className="ml-auto rounded border border-line px-1 font-sans text-meta">?</kbd>
+        </button>
       </nav>
 
       {/* Phone widths */}

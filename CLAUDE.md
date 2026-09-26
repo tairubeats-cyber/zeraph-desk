@@ -302,6 +302,21 @@ wording and structure.
     elsewhere, and that it can't be undone.
   - *The screen says what's true and claims nothing more:* no sessions or devices (there's no sign-in), the database
     isn't encrypted by ZeraphDesk (suggest the computer's disk encryption), no app lock, no certifications.
+- **Timeline and keyboard shortcuts (phase 9).** `timeline.ts`, `views/Timeline.tsx`, `shortcuts.ts`, `components/ShortcutsHelp.tsx`.
+  - *The timeline keeps facts and projections apart.* Earlier entries come from your transactions, goal deposits and
+    past findings (fact or calculation); entries ahead come from repeating patterns, planned items and goal deadlines
+    (always a projection, tagged as one). A date is only on it because one of those puts it there; it forecasts no balance
+    and invents no event. Earlier lines are chosen so it stays readable: every income deposit, every recurring payment that
+    posted, each month's three largest purchases of at least $50, anything that stands out for its category, goal deposits,
+    missed deadlines, and findings already true. A finding dated in the future is a bill or due date, which the schedule
+    already has, so it isn't repeated. The Transactions screen still has everything.
+  - *Shortcuts are data plus a state machine* (`createMatcher`), tested without a browser. "g" then a letter goes to a screen
+    (`GO_KEYS`; a test checks every target is a real, built screen), ? lists them, Ctrl/⌘+K asks, Ctrl/⌘+, opens
+    Preferences. They never fire while typing in a field or with a dialog open (the two Ctrl/⌘ ones excepted), never with
+    Ctrl, ⌘ or Alt held (so copy, paste and find are left alone), and the "g" is forgotten after 1.5 seconds. A new screen
+    that should have a shortcut gets a letter in `GO_KEYS`; `/` on Transactions is that page's own.
+  - *Dialogs close with Escape wherever focus is* (a window-level listener), not only when focus is inside them; clicking a
+    blank spot in a dialog moves focus to the page. Keep that when adding a dialog.
 - **Seeding is idempotent.** Default rows go in with INSERT OR IGNORE behind a
   single shared promise, never "insert if the table is empty"; concurrent loads
   once left categories missing.
@@ -310,9 +325,10 @@ wording and structure.
   Preferences; Forecast, Scenarios, Debt, Net Worth; Investments with portfolio analysis
   and the long-term plan). Phase 6 is done except automatic sync: file import, SimpleFIN sync,
   balance snapshots and system notifications. Background or scheduled sync, and holdings from the bridge, are not built.
-  Phases 7 (financial health and spending analysis) and 8 (privacy and data controls) are done; the spec defines
-  only phases 1 to 6, so both were chosen by the owner from the spec's own unbuilt sections. Still unbuilt from the spec:
-  a timeline and keyboard shortcuts, investment positions from the bridge, automatic sync, and real AI chat.
+  Phases 7 (financial health and spending analysis), 8 (privacy and data controls) and 9 (timeline and keyboard
+  shortcuts) are done; the spec defines only phases 1 to 6, so these were chosen by the owner from the spec's own unbuilt
+  sections. Still unbuilt from the spec: investment positions from the bridge, the phone layout the spec describes
+  (Overview, Transactions, Accounts, Goals, Intelligence with bottom sheets), automatic sync, and real AI chat.
   Tests are in `tests/` (run `npm test`); add a suite for any new calculation.
   Don't fake a later phase inside an earlier one.
 

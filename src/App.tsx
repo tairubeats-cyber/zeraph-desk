@@ -8,6 +8,9 @@ import { ComingSoon } from "./views/ComingSoon";
 import { Overview } from "./views/Overview";
 import { Transactions } from "./views/Transactions";
 import { Spending } from "./views/Spending";
+import { Timeline } from "./views/Timeline";
+import { ShortcutsHelp } from "./components/ShortcutsHelp";
+import { CHORD_MS, createMatcher } from "./lib/shortcuts";
 import { Health } from "./views/Health";
 import { Accounts } from "./views/Accounts";
 import { CashFlow } from "./views/CashFlow";
@@ -57,6 +60,8 @@ export default function App() {
   const [mailConnected, setMailConnected] = useState<boolean | null>(null);
   const [asked, setAsked] = useState<Asked[]>([]);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [chordHint, setChordHint] = useState(false);
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -86,16 +91,57 @@ export default function App() {
     [intel.askContext, flash],
   );
 
-  // Ctrl+K / ⌘K opens Ask from anywhere.
+  // Keyboard shortcuts (see lib/shortcuts.ts for the rules): Ctrl/⌘+K asks, ? lists them, "g" then a letter goes to a screen.
   useEffect(() => {
+    const matcher = createMatcher();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const typing = (t: EventTarget | null) => {
+      if (!(t instanceof HTMLElement)) return false;
+      if (t.isContentEditable || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement) return true;
+      return t instanceof HTMLInputElement && !["checkbox", "radio", "button", "submit", "reset", "range", "color", "file", "image"].includes(t.type);
+    };
     function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setPaletteOpen((o) => !o);
+      if (e.isComposing || e.repeat) return;
+      const r = matcher.press({
+        key: e.key,
+        ctrl: e.ctrlKey,
+        meta: e.metaKey,
+        alt: e.altKey,
+        shift: e.shiftKey,
+        editable: typing(e.target),
+        dialogOpen: document.querySelector('[aria-modal="true"]') !== null,
+      });
+      clearTimeout(timer);
+      setChordHint(r.waiting);
+      if (r.waiting) {
+        timer = setTimeout(() => {
+          matcher.reset();
+          setChordHint(false);
+        }, CHORD_MS);
+      }
+      if (r.handled) e.preventDefault();
+      switch (r.action?.type) {
+        case "ask":
+          setPaletteOpen((o) => !o);
+          break;
+        case "help":
+          setHelpOpen(true);
+          break;
+        case "preferences":
+          setTxPreset(undefined);
+          setView("preferences");
+          break;
+        case "go":
+          setTxPreset(undefined);
+          setView(r.action.view);
+          break;
       }
     }
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("keydown", onKey);
+    };
   }, []);
 
   const current = findItem(view);
@@ -111,6 +157,8 @@ export default function App() {
         return <Transactions finance={finance} preset={txPreset} />;
       case "health":
         return <Health finance={finance} plans={plans} planning={planning} intel={intel} onOpen={open} />;
+      case "timeline":
+        return <Timeline finance={finance} plans={plans} planning={planning} intel={intel} onOpen={open} />;
       case "spending":
         return <Spending finance={finance} plans={plans} onOpen={open} />;
       case "cash-flow":
@@ -303,6 +351,7 @@ export default function App() {
         current={view}
         badges={{ queue: pending.length, "action-center": intel.items.filter((i) => !i.state.read).length }}
         onAsk={() => setPaletteOpen(true)}
+        onShortcuts={() => setHelpOpen(true)}
         bell={<NotificationBell intel={intel} onOpen={open} />}
         onSelect={(v) => open(v)}
       />
@@ -336,6 +385,12 @@ export default function App() {
         {toast?.text}
       </div>
       <AskPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onAsk={ask} />
+      <ShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
+      {chordHint && (
+        <div aria-hidden="true" className="pointer-events-none fixed bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-xl bg-hud px-4 py-2.5 text-label text-hud-text shadow-elevated max-md:hidden">
+          Go to… press a letter (? lists them)
+        </div>
+      )}
       {toast && (
         <div
           key={toast.id}

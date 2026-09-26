@@ -31,6 +31,16 @@ export function AskPalette({
     };
   }, [open]);
 
+  // Escape closes it wherever focus has ended up: clicking a blank spot inside the dialog moves focus to the page.
+  useEffect(() => {
+    if (!open) return;
+    function onEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   const q = text.trim().toLowerCase();

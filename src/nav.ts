@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   ListChecks,
   Lock,
+  Milestone,
   Plug,
   ReceiptText,
   Repeat,
@@ -44,6 +45,7 @@ export type ViewKey =
   | "transactions"
   | "spending"
   | "cash-flow"
+  | "timeline"
   | "bills"
   | "recurring"
   | "budgets"
@@ -94,6 +96,7 @@ export const PHASES: Record<number, string> = {
   6: "Infrastructure",
   7: "Financial health",
   8: "Privacy and data controls",
+  9: "Timeline and keyboard shortcuts",
 };
 
 export const OVERVIEW: NavItem = {
@@ -124,6 +127,7 @@ export const GROUPS: NavGroup[] = [
       { key: "transactions", label: "Transactions", icon: ReceiptText, built: true, phase: 1, about: "Search, sort and categorise what came in and went out." },
       { key: "spending", label: "Spending", icon: ChartColumn, built: true, phase: 7, about: "Where the money went, by category, with how it compares with last month and last year, who it went to, and what stands out." },
       { key: "cash-flow", label: "Cash Flow", icon: ArrowDownUp, built: true, phase: 2, about: "Income against spending over time, and the recurring payments that shape it." },
+      { key: "timeline", label: "Timeline", icon: Milestone, built: true, phase: 9, about: "What happened and what is scheduled, in date order: income, bills, larger purchases, goal deposits and deadlines, and findings." },
       { key: "bills", label: "Bills", icon: CalendarDays, built: true, phase: 2, about: "Upcoming bills on a calendar, with due dates, paid status and autopay." },
       { key: "recurring", label: "Recurring", icon: Repeat, built: true, phase: 2, about: "Subscriptions and repeating payments found in your transactions, with what each costs a year." },
     ],
