@@ -305,7 +305,7 @@ export default function App() {
           key={view}
           className={
             "mx-auto w-full animate-view-in px-4 py-6 md:px-8 md:py-10 " +
-            (current.group?.narrow || view === "more" ? "max-w-[760px]" : "max-w-[1120px]")
+            (current.group?.narrow || view === "more" ? "max-w-[760px] xl:max-w-[880px] 2xl:max-w-[1040px]" : "max-w-[1120px] xl:max-w-[1360px] 2xl:max-w-[1640px]")
           }
         >
           {/* Phone widths: the sidebar's Ask and bell aren't there, so they sit here. */}
