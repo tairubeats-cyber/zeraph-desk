@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod mail;
+mod privacy;
 mod simplefin;
 
 use tauri_plugin_sql::{Migration, MigrationKind};
@@ -59,6 +60,7 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_sql::Builder::default()
                 .add_migrations("sqlite:zeraph.db", migrations)
@@ -69,6 +71,9 @@ fn main() {
             mail::mail_is_connected,
             mail::mail_pull,
             mail::mail_send,
+            mail::mail_forget,
+            privacy::save_export,
+            privacy::data_info,
             simplefin::simplefin_claim,
             simplefin::simplefin_connected,
             simplefin::simplefin_disconnect,

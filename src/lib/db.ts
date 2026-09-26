@@ -266,7 +266,47 @@ async function seedIfEmpty(handle: Database): Promise<void> {
   }
 }
 
+/** Every table the app owns. Names starting with an underscore or "sqlite_" belong to the database engine and the migrator. */
+async function ownTables(handle: Database): Promise<string[]> {
+  const rows = await handle.select<{ name: string }[]>(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite%' AND name NOT LIKE '\\_%' ESCAPE '\\' ORDER BY name",
+  );
+  // These come from the database's own catalogue, but they go into SQL text, so only plain names are allowed through.
+  return rows.map((r) => r.name).filter((n) => /^[a-z][a-z0-9_]*$/.test(n));
+}
+
 export const db = {
+  // --- Privacy: what is held, an export of it, and erasing it. Nothing here sends anything anywhere. ---
+
+  async tableNames(): Promise<string[]> {
+    return ownTables(await open());
+  },
+
+  /** How many rows each table holds. */
+  async tableCounts(): Promise<Record<string, number>> {
+    const handle = await open();
+    const out: Record<string, number> = {};
+    for (const name of await ownTables(handle)) {
+      const rows = await handle.select<{ n: number }[]>("SELECT COUNT(*) AS n FROM " + name);
+      out[name] = rows[0]?.n ?? 0;
+    }
+    return out;
+  },
+
+  /** Every row of every table, as stored, for an export. Credentials are filtered out by the caller (see privacy.ts). */
+  async allTables(): Promise<Record<string, Record<string, unknown>[]>> {
+    const handle = await open();
+    const out: Record<string, Record<string, unknown>[]> = {};
+    for (const name of await ownTables(handle)) out[name] = await handle.select<Record<string, unknown>[]>("SELECT * FROM " + name);
+    return out;
+  },
+
+  /** Empty every table. The app starts again as if newly installed (default categories and the example emails come back on the next launch). */
+  async eraseEverything(): Promise<void> {
+    const handle = await open();
+    for (const name of await ownTables(handle)) await handle.execute("DELETE FROM " + name);
+  },
+
   /**
    * Remove the invented example emails the first run shows. Called once a real email account is connected,
    * so an example reply can never sit beside (or be sent as) a real one. Returns how many rows went.

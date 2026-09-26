@@ -126,6 +126,16 @@ pub async fn mail_is_connected() -> Result<bool, String> {
     Ok(load_account().is_some())
 }
 
+/// Forget the saved mailbox login on this computer. Nothing is sent to the mail provider; the app password
+/// simply stops being stored here. (To revoke it for good, delete the app password in the email account.)
+#[tauri::command]
+pub async fn mail_forget() -> Result<(), String> {
+    match keychain_entry()?.delete_credential() {
+        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
 /// Unread messages since the cursor (an IMAP UID watermark), normalized.
 /// Never marks anything read — the owner's inbox is theirs.
 #[tauri::command]

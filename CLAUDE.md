@@ -259,9 +259,9 @@ wording and structure.
     - *Balance history starts at the first sync* (a snapshot per sync); it isn't reconstructed.
     - *Not built:* automatic or background sync, Plaid, and the bridge's `holdings` (positions), so linked
       investment accounts still show a balance and nothing finer. Say "not built" rather than fake it.
-    - *Security wording* (`Security` in Settings) must keep saying what leaves this computer: a read-only key and
-      a date range go to the bridge, balances and transactions come straight back, and SimpleFIN knows which
-      accounts were linked.
+    - *Security wording* (the services table in `views/Security.tsx`) must keep saying what leaves this computer: a
+      read-only key and a date range go to the bridge, balances and transactions come straight back, and SimpleFIN knows
+      which accounts were linked. Add a row there for any new outside service.
 - **Financial health and spending analysis (phase 7).** Two screens, both pure calculations over what the
   other screens already show (`health.ts`, `spending.ts`), so a figure means the same thing everywhere.
   - *Financial Health is six areas and never a score* (cash flow, savings, debt, investing, spending, goals). A single
@@ -285,6 +285,23 @@ wording and structure.
     own seed, so adding older months never changes a newer one.
   - *Ask answers "How am I doing financially?"* from the same figures (`healthAnswer`), lists what isn't available yet, and
     says it isn't a grade.
+- **Privacy and data controls (phase 8).** The Security screen (`views/Security.tsx`, `privacy.ts`, `privacy.rs`) is where the
+  person sees what's held, what can leave, and controls it.
+  - *Every table is described.* `TABLES` in `privacy.ts` names each table and the group it's shown under; a test reads the
+    migrations and fails if a table exists that isn't described, so a new feature can't quietly store something the person
+    can't see or export. Add the table there when you add a migration.
+  - *Exports never contain a secret.* The email password and SimpleFIN key were never in the database (keychain only);
+    the seat token is filtered from `settings` (`SECRET_SETTING_KEYS`). Anything new that is a credential goes in that list.
+  - *A file is only written where the person picks, through the system's Save dialog opened from Rust* (`save_export`).
+    The webview sends text and a suggested name and never a path, and only .json and .csv are allowed. (A blob download
+    doesn't work inside the app; don't try again.)
+  - *The transactions CSV* is decimals with money out negative, opens in Excel (byte-order mark), and defuses cells that
+    start with = + - or @ so a merchant name can't run as a formula. It exports only real data, never the sample.
+  - *Delete everything* needs the word typed, forgets the email and SimpleFIN logins, empties every table and reloads, so the
+    app starts as if newly installed. It says plainly that it can't revoke the SimpleFIN token or the email app password
+    elsewhere, and that it can't be undone.
+  - *The screen says what's true and claims nothing more:* no sessions or devices (there's no sign-in), the database
+    isn't encrypted by ZeraphDesk (suggest the computer's disk encryption), no app lock, no certifications.
 - **Seeding is idempotent.** Default rows go in with INSERT OR IGNORE behind a
   single shared promise, never "insert if the table is empty"; concurrent loads
   once left categories missing.
@@ -293,8 +310,9 @@ wording and structure.
   Preferences; Forecast, Scenarios, Debt, Net Worth; Investments with portfolio analysis
   and the long-term plan). Phase 6 is done except automatic sync: file import, SimpleFIN sync,
   balance snapshots and system notifications. Background or scheduled sync, and holdings from the bridge, are not built.
-  Phase 7 (financial health and spending analysis) is done; the spec defines only phases 1 to 6, so phase 7 was chosen by
-  the owner from the spec's own unbuilt sections.
+  Phases 7 (financial health and spending analysis) and 8 (privacy and data controls) are done; the spec defines
+  only phases 1 to 6, so both were chosen by the owner from the spec's own unbuilt sections. Still unbuilt from the spec:
+  a timeline and keyboard shortcuts, investment positions from the bridge, automatic sync, and real AI chat.
   Tests are in `tests/` (run `npm test`); add a suite for any new calculation.
   Don't fake a later phase inside an earlier one.
 

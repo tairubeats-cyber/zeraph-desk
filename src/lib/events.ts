@@ -33,7 +33,8 @@ export type EventKind =
   | "simplefin_connected"
   | "simplefin_disconnected"
   | "account_synced_added"
-  | "account_synced";
+  | "account_synced"
+  | "data_exported";
 
 export interface Event {
   id: ID;

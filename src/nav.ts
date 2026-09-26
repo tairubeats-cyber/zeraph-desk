@@ -93,6 +93,7 @@ export const PHASES: Record<number, string> = {
   5: "Wealth",
   6: "Infrastructure",
   7: "Financial health",
+  8: "Privacy and data controls",
 };
 
 export const OVERVIEW: NavItem = {
@@ -178,7 +179,7 @@ export const GROUPS: NavGroup[] = [
     items: [
       { key: "profile", label: "Profile", icon: User, built: false, about: "Your name and how ZeraphDesk addresses you." },
       { key: "connections", label: "Connections", icon: Plug, built: true, about: "The email account and service seat ZeraphDesk uses." },
-      { key: "security", label: "Security", icon: Lock, built: true, about: "What stays on this computer, and what leaves it." },
+      { key: "security", label: "Security", icon: Lock, built: true, phase: 8, about: "What ZeraphDesk holds, what can leave this computer, and your controls: export your data or delete all of it." },
       { key: "preferences", label: "Preferences", icon: SlidersHorizontal, built: true, about: "What ZeraphDesk watches, and which notifications you get." },
     ],
   },

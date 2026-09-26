@@ -8,7 +8,6 @@ import { TextField } from "@/components/ui/field";
 import { PageHeader } from "../components/PageHeader";
 import { FinancialData } from "@/components/finance/FinancialData";
 import { SimplefinConnection } from "@/components/finance/Simplefin";
-import { simplefin } from "@/lib/finance/syncSimplefin";
 import type { Finance } from "@/lib/finance/useFinance";
 
 const EMPTY_MAIL_FORM = {
@@ -233,49 +232,6 @@ export function Connections({ finance, onNotify }: { finance: Finance; onNotify:
           </Card>
         </Section>
 
-      </div>
-    </div>
-  );
-}
-
-export function Security({ source }: { source: "sample" | "import" }) {
-  const [linked, setLinked] = useState(false);
-  useEffect(() => {
-    simplefin.isConnected().then(setLinked, () => setLinked(false));
-  }, []);
-  return (
-    <div>
-      <PageHeader title="Security" description="What stays on this computer, and what leaves it." />
-
-      <div className="space-y-8">
-        <Section title="What leaves this computer">
-          <Card className="space-y-3 p-5 md:p-6">
-            <p className="max-w-[56ch] text-body text-ink-secondary">
-              Email: your documents stay on this machine. To write a reply, Desk sends the message it's answering
-              and the few lines it pulled from your files. Nothing else is uploaded, and nothing is used to
-              train a model.
-            </p>
-            <p className="max-w-[56ch] text-body text-ink-secondary">
-              Finance: nothing, unless you link accounts with SimpleFIN. Files you import are read on this computer and never uploaded.{" "}
-              {source === "sample" ? "The figures you see now are sample data." : ""}
-            </p>
-            <p className="max-w-[56ch] text-body text-ink-secondary">
-              {linked
-                ? "You've connected SimpleFIN. When you press Sync, ZeraphDesk contacts SimpleFIN Bridge with a read-only access key and a range of dates, and gets back the names, balances and transactions of the accounts you linked. They come straight to this computer, not through Zeraph's servers. SimpleFIN, which runs the bridge, knows which accounts you linked. Nothing else in finance uses the network, and nothing syncs unless you press Sync."
-                : "If you link accounts with SimpleFIN, ZeraphDesk contacts SimpleFIN Bridge only when you press Sync, with a read-only access key and a range of dates, and gets your balances and transactions back straight to this computer, not through Zeraph's servers. SimpleFIN, which runs the bridge, would know which accounts you linked."}
-            </p>
-          </Card>
-        </Section>
-
-        <Section title="Where things are kept">
-          <Card className="p-5 md:p-6">
-            <p className="max-w-[56ch] text-body text-ink-secondary">
-              Your email app password, and the SimpleFIN access key if you link accounts, are held in this computer's keychain. Everything else, including your
-              categories, notes, drafts and any accounts and transactions you import or sync, is stored in a database file on this computer.
-              It isn't encrypted by ZeraphDesk, so anyone who can open your user account on this computer can read it.
-            </p>
-          </Card>
-        </Section>
       </div>
     </div>
   );

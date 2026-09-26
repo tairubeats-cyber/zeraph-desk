@@ -27,7 +27,8 @@ import { Preferences } from "./views/Preferences";
 import { Queue } from "./views/Queue";
 import { History } from "./views/History";
 import { Facts } from "./views/Facts";
-import { Connections, Security } from "./views/Settings";
+import { Connections } from "./views/Settings";
+import { Security } from "./views/Security";
 import { db, newEvent } from "./lib/db";
 import type { Action } from "./lib/actions";
 import { type BusinessFacts, EMPTY_FACTS } from "./lib/facts";
@@ -166,7 +167,7 @@ export default function App() {
       case "connections":
         return <Connections finance={finance} onNotify={flash} />;
       case "security":
-        return <Security source={finance.source} />;
+        return <Security finance={finance} intel={intel} onNotify={flash} />;
       case "more":
         return <AllSections onOpen={open} />;
       default:
