@@ -73,6 +73,8 @@ export interface FinancePreferences {
   systemNotifications: boolean;
   /** How many months of spending the person wants set aside as an emergency fund. null until they say; never guessed. */
   emergencyMonths: number | null;
+  /** AI chat is on. Off until the person turns it on; even then nothing is sent until they press Send on a message they have reviewed. */
+  aiChat: boolean;
 }
 
 export const DEFAULT_PREFS: FinancePreferences = {
@@ -82,6 +84,7 @@ export const DEFAULT_PREFS: FinancePreferences = {
   watch: Object.fromEntries(DETECTORS.map((d) => [d.id, true])) as Record<DetectorId, boolean>,
   systemNotifications: false,
   emergencyMonths: null,
+  aiChat: false,
 };
 
 /** Read saved preferences, filling anything missing or malformed from the defaults. */
@@ -99,6 +102,7 @@ export function mergePrefs(saved: unknown): FinancePreferences {
     notify,
     watch,
     systemNotifications: bool(s.systemNotifications, false),
+    aiChat: bool(s.aiChat, false),
     emergencyMonths: typeof s.emergencyMonths === "number" && s.emergencyMonths >= 0.5 && s.emergencyMonths <= 60 ? Math.round(s.emergencyMonths * 10) / 10 : null,
   };
 }

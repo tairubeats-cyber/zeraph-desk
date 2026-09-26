@@ -175,9 +175,15 @@ export function Security({ finance, intel, onNotify }: { finance: Finance; intel
     },
     {
       name: "Zeraph's reply service",
-      sees: "The message being answered and the few lines pulled from your business sheet. Never your finances.",
+      sees: "For email drafts: the message being answered and the few lines pulled from your business sheet. Never your finances. AI chat uses the same service and has its own row below.",
       when: "Each time a draft is written.",
       status: facts ? (facts.seat ? { label: "Seat token saved", tone: "on" } : { label: "No seat token", tone: "off" }) : null,
+    },
+    {
+      name: "Claude, for AI chat",
+      sees: "Your question, the earlier messages in that chat, and a summary of your finances: balances by kind of account, monthly income and spending, category totals, budgets, goals, debts and the investment mix. You can leave parts out of any message. It has no merchant names, transactions, account names or bank names. It goes through Zeraph's service, which counts tokens and doesn't keep the text. Anthropic, which runs Claude, handles it under its own terms.",
+      when: "Only when you press Send on a message you reviewed in AI chat, and only if you turned it on.",
+      status: intel.prefs.aiChat ? { label: "On", tone: "on" } : { label: "Off", tone: "off" },
     },
     {
       name: "SimpleFIN Bridge",
@@ -193,7 +199,7 @@ export function Security({ finance, intel, onNotify }: { finance: Finance; intel
     },
     {
       name: "Everything else",
-      sees: "Nothing. Your accounts, budgets, goals, health figures, and your questions to Ask ZeraphDesk stay on this computer.",
+      sees: "Nothing. Your accounts, budgets, goals, health figures, and your questions to Ask ZeraphDesk stay on this computer. The exception is what you choose to send in AI chat, above.",
       when: "Always.",
       status: null,
     },
@@ -209,7 +215,7 @@ export function Security({ finance, intel, onNotify }: { finance: Finance; intel
         <Section title="What can leave this computer">
           <Card className="p-5 md:p-6">
             <p className="max-w-[62ch] text-body text-ink-secondary">
-              Only the connections below can send or receive anything, and each does so for the reason and at the time shown. Nothing is sent to anyone else, and nothing is used to train a model.
+              Only the connections below can send or receive anything, and each does so for the reason and at the time shown. Nothing is sent to anyone else, and Zeraph doesn't use any of it to train a model.
             </p>
             <div className="mt-4 overflow-x-auto">
               <table className="w-full min-w-[640px] text-left">

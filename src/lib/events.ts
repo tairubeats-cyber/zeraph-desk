@@ -34,7 +34,9 @@ export type EventKind =
   | "simplefin_disconnected"
   | "account_synced_added"
   | "account_synced"
-  | "data_exported";
+  | "data_exported"
+  | "ai_chat_changed"
+  | "ai_message_sent";
 
 export interface Event {
   id: ID;

@@ -9,6 +9,8 @@ import { Overview } from "./views/Overview";
 import { Transactions } from "./views/Transactions";
 import { Spending } from "./views/Spending";
 import { Timeline } from "./views/Timeline";
+import { Chat } from "./views/Chat";
+import { useChat } from "./lib/finance/useChat";
 import { ShortcutsHelp } from "./components/ShortcutsHelp";
 import { CHORD_MS, createMatcher } from "./lib/shortcuts";
 import { Health } from "./views/Health";
@@ -75,6 +77,7 @@ export default function App() {
   const plans = usePlans(finance, flash);
   const planning = usePlanning(flash);
   const intel = useIntel(finance, plans, planning, flash);
+  const chat = useChat(intel);
 
   /** Work out an answer from the data on this computer and show it on the Ask screen. */
   const ask = useCallback(
@@ -185,6 +188,8 @@ export default function App() {
         return <ActionCenter finance={finance} plans={plans} intel={intel} onOpen={open} onNotify={flash} />;
       case "activity":
         return <Activity finance={finance} intel={intel} onOpen={open} />;
+      case "chat":
+        return <Chat chat={chat} onOpen={open} />;
       case "ask":
         return <Ask history={asked} ready={intel.askContext !== null} onAsk={ask} onOpen={open} />;
       case "preferences":

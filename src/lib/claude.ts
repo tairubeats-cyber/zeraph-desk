@@ -10,12 +10,23 @@ export interface GenerateOptions {
   system: string;
   messages: { role: "user" | "assistant"; content: string }[];
   maxTokens?: number;
+  /** Lets the caller stop a request that's taking too long or that the person cancelled. */
+  signal?: AbortSignal;
+}
+
+/** The proxy answered, but not with a reply. `status` says why: 401 unknown seat token, 429 too many requests, 5xx trouble upstream. */
+export class ApiError extends Error {
+  constructor(readonly status: number) {
+    super(`Draft failed (${status}). Check your connection and try again.`);
+    this.name = "ApiError";
+  }
 }
 
 export async function generate(opts: GenerateOptions, seatToken: string): Promise<string> {
   const res = await fetch(`${API}/v1/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${seatToken}` },
+    signal: opts.signal,
     body: JSON.stringify({
       system: opts.system,
       messages: opts.messages,
@@ -24,7 +35,7 @@ export async function generate(opts: GenerateOptions, seatToken: string): Promis
   });
 
   if (!res.ok) {
-    throw new Error(`Draft failed (${res.status}). Check your connection and try again.`);
+    throw new ApiError(res.status);
   }
 
   const data = (await res.json()) as { content: { type: string; text?: string }[] };

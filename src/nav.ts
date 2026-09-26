@@ -14,6 +14,7 @@ import {
   ListChecks,
   Lock,
   Milestone,
+  MessagesSquare,
   Plug,
   ReceiptText,
   Repeat,
@@ -57,6 +58,7 @@ export type ViewKey =
   | "debt"
   | "action-center"
   | "ask"
+  | "chat"
   | "activity"
   | "queue"
   | "history"
@@ -97,6 +99,7 @@ export const PHASES: Record<number, string> = {
   7: "Financial health",
   8: "Privacy and data controls",
   9: "Timeline and keyboard shortcuts",
+  10: "AI chat",
 };
 
 export const OVERVIEW: NavItem = {
@@ -161,6 +164,7 @@ export const GROUPS: NavGroup[] = [
     items: [
       { key: "action-center", label: "Action Center", icon: ListChecks, built: true, phase: 3, about: "Things that deserve your attention, with the data behind each and the options you have." },
       { key: "ask", label: "Ask ZeraphDesk", icon: Sparkles, built: true, phase: 3, about: "Ask questions about your own numbers. Answers show the data they used." },
+      { key: "chat", label: "AI chat", icon: MessagesSquare, built: true, phase: 10, about: "Talk through your finances with Claude. Off until you turn it on, and you review exactly what's sent before every message." },
       { key: "activity", label: "Activity", icon: Activity, built: true, phase: 3, about: "A chronological feed of what changed in your finances." },
     ],
   },

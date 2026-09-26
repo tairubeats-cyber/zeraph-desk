@@ -1,0 +1,68 @@
+name: Checks
+
+# Runs on every pull request, so a change from anyone (a person, Devin, another tool) is tested before it is merged.
+# It builds nothing you'd install and makes no release; that is still the tag-triggered "Build installers" workflow.
+#
+# To make these required, turn on branch protection for main (Settings > Branches) and require "Type-check and tests"
+# and "Rust tests".
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Type-check and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # tsc is also the first half of "npm run build"
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      # Every suite in tests/ (finance calculations, AI chat summary, privacy exports, shortcuts and so on)
+      - name: Tests
+        run: npm test
+
+  rust:
+    name: Rust tests
+    # Windows, like the app's main platform. It needs none of the Linux webview packages that Tauri wants.
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      # Tauri's build script needs the built front end to exist.
+      - run: npm run build
+
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml

@@ -32,6 +32,7 @@ export const GO_KEYS: Record<string, { view: ViewKey; label: string }> = {
   d: { view: "debt", label: "Debt" },
   e: { view: "action-center", label: "Action Center" },
   y: { view: "activity", label: "Activity" },
+  m: { view: "chat", label: "AI chat" },
   q: { view: "queue", label: "Replies waiting" },
   p: { view: "preferences", label: "Preferences" },
 };

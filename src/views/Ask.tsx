@@ -187,7 +187,7 @@ export function Ask({
 
       <div className="mt-3 flex items-start gap-2 px-1 text-meta text-ink-tertiary">
         <ShieldCheck className="mt-px h-3.5 w-3.5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-        <p>Answers are worked out on this computer from your data. Your question and your numbers aren't sent anywhere.</p>
+        <p>Answers are worked out on this computer from your data. Your question and your numbers aren't sent anywhere. For open-ended questions there's also AI chat, which sends only what you approve.</p>
       </div>
 
       {history.length === 0 ? (

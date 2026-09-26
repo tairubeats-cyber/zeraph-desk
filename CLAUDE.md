@@ -144,14 +144,13 @@ wording and structure.
   than at this point last month", not "you overspent".
 - **Comparing months:** compare the same stretch (through today's day of month),
   never a partial month against a full one.
-- **The one finance network call is a SimpleFIN sync the person asked for** (below). When
-  Intelligence (AI over the user's data) is built it goes through the proxy like drafts do,
-  and what's sent needs a decision first: the desk rule is "only what the answer needs".
+- **Two finance network calls, both a click:** a SimpleFIN sync the person asked for (below), and a message the person
+  reviewed and sent in AI chat (phase 10, below). AI goes through the proxy like drafts do.
 - **Navigation is one file, `src/nav.ts`.** The sidebar, phone tab bar, section
   tabs, "All sections" page and the view switch in `App.tsx` all read it. The tree
   is Overview; Money (Accounts, Transactions, Cash Flow, Bills, Recurring); Planning
   (Budgets, Goals, Forecast, Scenarios); Wealth (Net Worth, Investments, Debt);
-  Intelligence (Action Center, Ask ZeraphDesk, Activity); Desk (the email product);
+  Intelligence (Action Center, Ask ZeraphDesk, AI chat, Activity); Desk (the email product);
   Settings (Profile, Connections, Security, Preferences). Unbuilt sections stay
   listed with `built: false` and open a plain "not built yet" page. Building one
   means flipping that flag, adding its case in `App.tsx`, and nothing else.
@@ -181,7 +180,8 @@ wording and structure.
   rather than guess (it can show which balances moved over a period, never why; with no balance history it says it can't).
   Nothing about a question or the data is sent anywhere. If a model is ever put in
   front of it to understand wording, it must call these same functions and add no
-  numbers of its own; whether any data may be sent to one is a separate decision.
+  numbers of its own; whether any data may be sent to one is a separate decision. (Phase 10 made that decision as a separate
+  screen, AI chat, and left Ask as it was: it never sends anything.)
 - **Planning (phase 4).** Nothing here is stored except what the person enters
   (`fin_debt_terms`, `fin_holdings` and their dated values, `fin_planned`,
   `fin_scenarios`); forecasts, payoff dates and scenario results are recomputed.
@@ -317,6 +317,28 @@ wording and structure.
     that should have a shortcut gets a letter in `GO_KEYS`; `/` on Transactions is that page's own.
   - *Dialogs close with Escape wherever focus is* (a window-level listener), not only when focus is inside them; clicking a
     blank spot in a dialog moves focus to the page. Keep that when adding a dialog.
+- **AI chat (phase 10).** `aiChat.ts` (pure), `useChat.ts`, `views/Chat.tsx`. The one place a summary of the person's finances leaves the
+  computer, so every part of it is decided in `aiChat.ts` and shown before it goes.
+  - *The owner chose the broad scope:* the question plus a summary of finances, not just the question. So replies are "AI
+    insight", never fact, and the app can't stop the model saying a number of its own. It says so instead (below).
+  - *Off until turned on* (`aiChat` in preferences), needs a seat token, and *nothing is sent except by the Send button* on a
+    review step that shows the exact text (`sentText`, the same object that is posted, so what's shown is what goes). Enter or
+    a suggested question only opens the review. The person can leave any part of the summary out of a message.
+  - *The summary* (`buildSummary`) holds balances by kind of account ("Checking 1", never a name, bank or number), monthly
+    income and spending, the ten biggest category totals by month, budgets, goals, debts (rate and payment only if they entered
+    them), recurring totals, the investment mix and the targets they set. It holds no merchant names, transactions or
+    descriptions; a test checks that none from the sample appears. Names the person typed (goals) pass through `plainText`
+    (one short line, no tag characters) so they can't close the `<summary>` block, and the rules tell the model the summary is
+    data, not instructions.
+  - *The reply is checked, not trusted.* `unconfirmedFigures` flags dollar amounts that weren't among those sent (allowing
+    rounding to 2 or 3 figures) as "Claude's own arithmetic or a guess". It only catches dollar figures; percentages and
+    dates aren't checked. Every reply carries "can be wrong, not financial advice".
+  - *Nothing is stored.* The chat lives in memory and is gone when the app closes, so there's no table to export or erase. The
+    event log gets counts only (`ai_message_sent`: characters and number of parts; `ai_chat_changed`), never the text.
+  - *It reuses `/v1/generate`* on the existing Worker (no redeploy). Errors are mapped to plain sentences
+    (`describeFailure`): 401 seat token, 429 wait, 5xx upstream, timeout at 60 seconds, cancelled by the person.
+  - *The Security screen* has a "Claude, for AI chat" row that says what's sent, when, and whether it's on, and says the
+    service counts tokens and doesn't keep the text, and that Anthropic handles it under its own terms. Keep that row true.
 - **Seeding is idempotent.** Default rows go in with INSERT OR IGNORE behind a
   single shared promise, never "insert if the table is empty"; concurrent loads
   once left categories missing.
@@ -325,10 +347,10 @@ wording and structure.
   Preferences; Forecast, Scenarios, Debt, Net Worth; Investments with portfolio analysis
   and the long-term plan). Phase 6 is done except automatic sync: file import, SimpleFIN sync,
   balance snapshots and system notifications. Background or scheduled sync, and holdings from the bridge, are not built.
-  Phases 7 (financial health and spending analysis), 8 (privacy and data controls) and 9 (timeline and keyboard
-  shortcuts) are done; the spec defines only phases 1 to 6, so these were chosen by the owner from the spec's own unbuilt
+  Phases 7 (financial health and spending analysis), 8 (privacy and data controls), 9 (timeline and keyboard
+  shortcuts) and 10 (AI chat) are done; the spec defines only phases 1 to 6, so these were chosen by the owner from the spec's own unbuilt
   sections. Still unbuilt from the spec: investment positions from the bridge, the phone layout the spec describes
-  (Overview, Transactions, Accounts, Goals, Intelligence with bottom sheets), automatic sync, and real AI chat.
+  (Overview, Transactions, Accounts, Goals, Intelligence with bottom sheets) and automatic sync.
   Tests are in `tests/` (run `npm test`); add a suite for any new calculation.
   Don't fake a later phase inside an earlier one.
 
